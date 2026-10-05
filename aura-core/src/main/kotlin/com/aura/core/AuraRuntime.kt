@@ -1,7 +1,7 @@
 package com.aura.core
 
 data class AuraRuntimeStatus(
-    val version: String = "1.8.0",
+    val version: String = "1.9.0",
     val policyBoundaryActive: Boolean = true,
     val memoryReady: Boolean = true,
     val agentRouterReady: Boolean = true
