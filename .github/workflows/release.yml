@@ -1,4 +1,5 @@
 name: AURA Release
+# Release gate: build, sign when configured, and publish to Play when configured.
 
 on:
   workflow_dispatch:
