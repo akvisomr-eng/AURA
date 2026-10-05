@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.aura.core.AuraRuntime
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     private lateinit var statusText: TextView
     private lateinit var sceneText: TextView
     private lateinit var listenButton: TextView
+
+    private val auraRuntime = AuraRuntime()
 
     private val cameraRequestCode = 1701
     private val microphoneRequestCode = 1702
@@ -79,7 +82,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         )
 
         val topPanel = TextView(this).apply {
-            text = "AURA 1.7\nCOGNITIVE VISION"
+            text = "AURA 1.8\nCOGNITIVE RUNTIME"
             textSize = 20f
             setTextColor(0xFF7FE7FF.toInt())
             setPadding(28, 24, 28, 18)
@@ -315,23 +318,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     }
 
     private fun handleCommand(command: String) {
-        val lower = command.lowercase(Locale("id", "ID"))
-        val response = when {
-            lower.contains("apa yang kamu lihat") ||
-                lower.contains("apa yang kau lihat") ||
-                lower.contains("lihat apa") ->
-                if (latestScene.isBlank()) "Saya belum mendapatkan hasil vision." else latestScene
-            lower.contains("halo") || lower.contains("hai") ->
-                "Halo. AURA siap membantu."
-            lower.contains("status") ->
-                "Core runtime siap. Camera vision aktif. Voice interface siap digunakan."
-            else ->
-                "Saya mendengar: " + command + ". Kemampuan agent dan memory akan terhubung pada tahap berikutnya."
-        }
-
-        statusText.text = "Anda: " + command
-        sceneText.text = response
-        speak(response)
+        val turn = auraRuntime.respond(command, latestScene)
+        statusText.text = "AURA • " + turn.intent.name
+        sceneText.text = turn.responseText
+        speak(turn.responseText)
     }
 
     private fun speak(text: String) {
