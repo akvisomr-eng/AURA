@@ -1,5 +1,17 @@
 plugins { kotlin("jvm") }
 kotlin { jvmToolchain(17) }
 
-// No JVM test sources are present in the reconstructed deployment source.
-// Keep the standard Gradle test task available without forcing a test engine dependency.
+dependencies {
+    // The reconstructed source currently contains no JVM test sources.
+    // Keep test compilation available for future tests without requiring a test engine now.
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    // Prevent an empty reconstructed test suite from invoking a missing JUnit engine.
+    // This becomes active automatically once actual test sources are restored.
+    onlyIf {
+        project.file("src/test").exists() &&
+            project.fileTree("src/test").matching { include("**/*.kt", "**/*.java") }.files.isNotEmpty()
+    }
+}
