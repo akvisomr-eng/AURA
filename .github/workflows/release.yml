@@ -21,6 +21,11 @@ jobs:
       contents: read
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g
+      AURA_KEYSTORE_B64: ${{ secrets.AURA_KEYSTORE_B64 }}
+      AURA_KEYSTORE_PASSWORD: ${{ secrets.AURA_KEYSTORE_PASSWORD }}
+      AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
+      AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
 
     steps:
       - name: Checkout
@@ -53,21 +58,15 @@ jobs:
           gradle lint --no-daemon
 
       - name: Decode release keystore
-        if: ${{ secrets.AURA_KEYSTORE_B64 != '' }}
-        env:
-          AURA_KEYSTORE_B64: ${{ secrets.AURA_KEYSTORE_B64 }}
+        if: ${{ env.AURA_KEYSTORE_B64 != '' }}
         run: echo "$AURA_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/aura-upload.jks"
 
       - name: Build unsigned release when no key is configured
-        if: ${{ secrets.AURA_KEYSTORE_B64 == '' }}
+        if: ${{ env.AURA_KEYSTORE_B64 == '' }}
         run: gradle assembleRelease bundleRelease --no-daemon
 
       - name: Build signed release
-        if: ${{ secrets.AURA_KEYSTORE_B64 != '' }}
-        env:
-          AURA_KEYSTORE_PASSWORD: ${{ secrets.AURA_KEYSTORE_PASSWORD }}
-          AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
-          AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
+        if: ${{ env.AURA_KEYSTORE_B64 != '' }}
         run: |
           gradle assembleRelease bundleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/aura-upload.jks" \
@@ -85,10 +84,10 @@ jobs:
           if-no-files-found: error
 
       - name: Upload to Google Play
-        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' && secrets.AURA_KEYSTORE_B64 != '' }}
+        if: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' && env.AURA_KEYSTORE_B64 != '' }}
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.aura.app
           releaseFiles: app/build/outputs/bundle/release/*.aab
           track: ${{ inputs.play_track || 'internal' }}
