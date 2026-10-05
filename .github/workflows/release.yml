@@ -74,6 +74,16 @@ jobs:
             -Pandroid.injected.signing.key.alias="$AURA_KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$AURA_KEY_PASSWORD"
 
+      - name: Build private installable debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - name: Upload private debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-1.6.4-private-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
       - name: Upload APK/AAB
         uses: actions/upload-artifact@v4
         with:
