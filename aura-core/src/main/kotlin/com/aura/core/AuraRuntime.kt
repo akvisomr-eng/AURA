@@ -80,7 +80,7 @@ class AuraRuntime(
     fun respond(userText: String, visionContext: String): AuraTurn {
         val intent = router.route(userText)
         val event = when (intent) {
-            AuraIntent.CAPABILITY_REQUEST -> AffectiveEvent.CURIOUS
+            AuraIntent.CAPABILITY_REQUEST -> AffectiveEvent.UNCERTAIN
             AuraIntent.VISION_QUERY -> if (visionContext.isBlank()) AffectiveEvent.UNCERTAIN else AffectiveEvent.SUCCESS
             else -> if (userText.length > 180) AffectiveEvent.USER_STRESSED else AffectiveEvent.USER_CASUAL
         }
