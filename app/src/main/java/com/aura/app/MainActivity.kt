@@ -30,6 +30,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.aura.core.AuraRuntime
+import com.aura.core.IndonesianVoiceRuntime
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     private lateinit var listenButton: TextView
 
     private val auraRuntime = AuraRuntime()
+    private val voiceRuntime = IndonesianVoiceRuntime()
 
     private val cameraRequestCode = 1701
     private val microphoneRequestCode = 1702
@@ -100,7 +102,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         root.addView(previewView, FrameLayout.LayoutParams(-1, -1))
 
         topPanel = TextView(this).apply {
-            text = "AURA 1.8  •  AKTIF"
+            text = "AURA 1.9  •  AKTIF"
             textSize = 18f
             maxLines = 2
             setTextColor(0xFF8BEAFF.toInt())
@@ -376,13 +378,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     }
 
     private fun speak(text: String) {
-        val naturalText = text
-            .replace("AURA 1.8 aktif.", "AURA satu titik delapan aktif.")
-            .replace("•", ", ")
-            .trim()
+        val spoken = voiceRuntime.prepare(text)
 
+        textToSpeech?.setSpeechRate(spoken.rate)
+        textToSpeech?.setPitch(spoken.pitch)
         textToSpeech?.speak(
-            naturalText,
+            spoken.text,
             TextToSpeech.QUEUE_FLUSH,
             null,
             "aura-id-response"
