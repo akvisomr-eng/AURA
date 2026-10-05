@@ -15,8 +15,8 @@ data class SpokenTurn(
 class IndonesianVoiceRuntime {
     fun prepare(text: String): SpokenTurn {
         val spoken = text
-            .replace("AURA 1.9 aktif.", "AURA satu titik sembilan aktif.")
-            .replace("AURA 1.8 aktif.", "AURA satu titik delapan aktif.")
+            .replace("AURA dua titik nol aktif.", "AURA satu titik sembilan aktif.")
+            .replace("AURA satu titik delapan aktif.", "AURA satu titik delapan aktif.")
             .replace(Regex("""\s*[•·]\s*"""), ", ")
             .replace(Regex("""\s+"""), " ")
             .trim()
