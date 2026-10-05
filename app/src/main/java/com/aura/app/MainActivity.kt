@@ -30,6 +30,8 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.aura.core.AuraRuntime
+import com.aura.core.AffectiveState
+import com.aura.core.AuraMood
 import com.aura.core.IndonesianVoiceRuntime
 import java.util.Locale
 import kotlin.math.max
@@ -102,7 +104,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         root.addView(previewView, FrameLayout.LayoutParams(-1, -1))
 
         topPanel = TextView(this).apply {
-            text = "AURA 1.9  •  AKTIF"
+            text = "AURA 2.0  •  AKTIF"
             textSize = 18f
             maxLines = 2
             setTextColor(0xFF8BEAFF.toInt())
@@ -374,14 +376,27 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         val turn = auraRuntime.respond(command, latestScene)
         statusText.text = "AURA • " + turn.intent.name
         sceneText.text = turn.responseText
-        speak(turn.responseText)
+        speak(turn.responseText, turn.affectiveState)
     }
 
-    private fun speak(text: String) {
+    private fun speak(text: String, affect: AffectiveState = AffectiveState()) {
         val spoken = voiceRuntime.prepare(text)
+        val rate = when (affect.mood) {
+            AuraMood.CONCERNED -> 0.86f
+            AuraMood.FRUSTRATED -> 0.90f
+            AuraMood.AMUSED, AuraMood.PROUD -> 0.96f
+            AuraMood.CURIOUS -> 0.93f
+            else -> spoken.rate
+        }
+        val pitch = when (affect.mood) {
+            AuraMood.CONCERNED -> 0.98f
+            AuraMood.AMUSED, AuraMood.PROUD -> 1.06f
+            AuraMood.FRUSTRATED -> 1.00f
+            else -> spoken.pitch
+        }
 
-        textToSpeech?.setSpeechRate(spoken.rate)
-        textToSpeech?.setPitch(spoken.pitch)
+        textToSpeech?.setSpeechRate(rate)
+        textToSpeech?.setPitch(pitch)
         textToSpeech?.speak(
             spoken.text,
             TextToSpeech.QUEUE_FLUSH,
