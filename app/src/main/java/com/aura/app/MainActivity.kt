@@ -1,30 +1,378 @@
 package com.aura.app
+
 import android.Manifest
-import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.widget.*
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.view.Gravity
+import android.widget.FrameLayout
+import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.objects.ObjectDetection
+import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
-class MainActivity : Activity() {
-    private lateinit var status: TextView
-    private val requestCode = 9001
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); render() }
+class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
+
+    private lateinit var previewView: PreviewView
+    private lateinit var statusText: TextView
+    private lateinit var sceneText: TextView
+    private lateinit var listenButton: TextView
+
+    private val cameraRequestCode = 1701
+    private val microphoneRequestCode = 1702
+    private val cameraExecutor = Executors.newSingleThreadExecutor()
+
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var textToSpeech: TextToSpeech? = null
+    private var detector = ObjectDetection.getClient(
+        ObjectDetectorOptions.Builder()
+            .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
+            .enableMultipleObjects()
+            .enableClassification()
+            .build()
+    )
+
+    @Volatile
+    private var latestScene = "Belum ada objek terdeteksi."
+
+    private val listening = AtomicBoolean(false)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        textToSpeech = TextToSpeech(this, this)
+        render()
+        ensureCamera()
+    }
+
     private fun render() {
-        val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(32,40,32,32); setBackgroundColor(getColor(com.aura.app.R.color.aura_bg)) }
-        val title=TextView(this).apply { text="AURA\nCognitive Runtime"; textSize=30f; setTextColor(getColor(com.aura.app.R.color.aura_accent)) }
-        status=TextView(this).apply { textSize=16f; setPadding(0,28,0,20); setTextColor(getColor(com.aura.app.R.color.aura_muted)) }
-        val permissions=Button(this).apply { text="Aktifkan Camera + Microphone"; setOnClickListener { requestRuntimePermissions() } }
-        root.addView(title); root.addView(status); root.addView(permissions); setContentView(ScrollView(this).apply { addView(root) }); updateStatus()
+        previewView = PreviewView(this).apply {
+            implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            setBackgroundColor(0xFF05070A.toInt())
+        }
+
+        val root = FrameLayout(this)
+
+        root.addView(
+            previewView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        val topPanel = TextView(this).apply {
+            text = "AURA 1.7\nCOGNITIVE VISION"
+            textSize = 20f
+            setTextColor(0xFF7FE7FF.toInt())
+            setPadding(28, 24, 28, 18)
+            setBackgroundColor(0xB805070A.toInt())
+        }
+        root.addView(
+            topPanel,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.TOP }
+        )
+
+        sceneText = TextView(this).apply {
+            textSize = 15f
+            setTextColor(0xFFE5EDF5.toInt())
+            setPadding(24, 14, 24, 14)
+            text = latestScene
+            setBackgroundColor(0xB805070A.toInt())
+        }
+        root.addView(
+            sceneText,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.BOTTOM
+                bottomMargin = 112
+            }
+        )
+
+        statusText = TextView(this).apply {
+            textSize = 13f
+            setTextColor(0xFFB8C4D0.toInt())
+            setPadding(24, 8, 24, 8)
+            text = "Menyiapkan kamera..."
+            setBackgroundColor(0xB805070A.toInt())
+        }
+        root.addView(
+            statusText,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.BOTTOM
+                bottomMargin = 72
+            }
+        )
+
+        listenButton = TextView(this).apply {
+            text = "●  BICARA DENGAN AURA"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF061016.toInt())
+            setBackgroundColor(0xFF7FE7FF.toInt())
+            setPadding(24, 18, 24, 18)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { toggleListening() }
+        }
+        root.addView(
+            listenButton,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                64
+            ).apply {
+                gravity = Gravity.BOTTOM
+                leftMargin = 24
+                rightMargin = 24
+                bottomMargin = 16
+            }
+        )
+
+        setContentView(root)
     }
-    private fun updateStatus() {
-        val camera=ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED
-        val mic=ContextCompat.checkSelfPermission(this,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED
-        status.text="AURA 1.6.4\n\nCore runtime: READY\nPolicy boundary: ACTIVE\nCamera permission: "+if(camera) "GRANTED" else "NOT GRANTED"+"\nMicrophone permission: "+if(mic) "GRANTED" else "NOT GRANTED"
+
+    private fun ensureCamera() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            startCamera()
+        } else {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                cameraRequestCode
+            )
+        }
     }
-    private fun requestRuntimePermissions() {
-        val missing=arrayOf(Manifest.permission.CAMERA,Manifest.permission.RECORD_AUDIO).filter { ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED }.toTypedArray()
-        if(missing.isNotEmpty()) ActivityCompat.requestPermissions(this,missing,requestCode) else updateStatus()
+
+    private fun startCamera() {
+        statusText.text = "Kamera aktif • perception online"
+
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({
+            val provider = providerFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.surfaceProvider = previewView.surfaceProvider
+            }
+
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { it.setAnalyzer(cameraExecutor, ::analyzeFrame) }
+
+            provider.unbindAll()
+            provider.bindToLifecycle(
+                this,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                preview,
+                analysis
+            )
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun analyzeFrame(imageProxy: ImageProxy) {
+        val mediaImage = imageProxy.image ?: run {
+            imageProxy.close()
+            return
+        }
+
+        val image = InputImage.fromMediaImage(
+            mediaImage,
+            imageProxy.imageInfo.rotationDegrees
+        )
+
+        detector.process(image)
+            .addOnSuccessListener { detectedObjects ->
+                if (detectedObjects.isEmpty()) {
+                    latestScene = "AURA melihat: belum ada objek yang dikenali."
+                } else {
+                    val labels = detectedObjects.flatMap { obj ->
+                        obj.labels.map { label -> label.text }
+                    }.distinct().take(4)
+
+                    latestScene = if (labels.isEmpty()) {
+                        "AURA melihat " + detectedObjects.size + " objek."
+                    } else {
+                        "AURA melihat: " + labels.joinToString(", ")
+                    }
+                }
+                runOnUiThread { sceneText.text = latestScene }
+            }
+            .addOnFailureListener {
+                latestScene = "Vision aktif • menunggu hasil stabil."
+                runOnUiThread { sceneText.text = latestScene }
+            }
+            .addOnCompleteListener {
+                imageProxy.close()
+            }
+    }
+
+    private fun toggleListening() {
+        if (listening.get()) {
+            speechRecognizer?.stopListening()
+            listening.set(false)
+            listenButton.text = "●  BICARA DENGAN AURA"
+            statusText.text = "Perception online"
+            return
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                microphoneRequestCode
+            )
+            return
+        }
+
+        startListening()
+    }
+
+    private fun startListening() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            statusText.text = "Speech recognition tidak tersedia di perangkat ini."
+            return
+        }
+
+        if (speechRecognizer == null) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    listening.set(true)
+                    listenButton.text = "■  AURA MENDENGARKAN"
+                    statusText.text = "Mendengarkan..."
+                }
+
+                override fun onBeginningOfSpeech() {
+                    statusText.text = "Mendengarkan suara Anda..."
+                }
+
+                override fun onEndOfSpeech() {
+                    listening.set(false)
+                    listenButton.text = "●  BICARA DENGAN AURA"
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val heard = results
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+
+                    if (heard.isNotEmpty()) handleCommand(heard)
+                }
+
+                override fun onError(error: Int) {
+                    listening.set(false)
+                    listenButton.text = "●  BICARA DENGAN AURA"
+                    statusText.text = "Siap • tekan tombol untuk berbicara lagi"
+                }
+
+                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onPartialResults(partialResults: Bundle?) = Unit
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            })
+        }
+
+        val intent = android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+
+        speechRecognizer?.startListening(intent)
+    }
+
+    private fun handleCommand(command: String) {
+        val lower = command.lowercase(Locale("id", "ID"))
+        val response = when {
+            lower.contains("apa yang kamu lihat") ||
+                lower.contains("apa yang kau lihat") ||
+                lower.contains("lihat apa") ->
+                if (latestScene.isBlank()) "Saya belum mendapatkan hasil vision." else latestScene
+            lower.contains("halo") || lower.contains("hai") ->
+                "Halo. AURA siap membantu."
+            lower.contains("status") ->
+                "Core runtime siap. Camera vision aktif. Voice interface siap digunakan."
+            else ->
+                "Saya mendengar: " + command + ". Kemampuan agent dan memory akan terhubung pada tahap berikutnya."
+        }
+
+        statusText.text = "Anda: " + command
+        sceneText.text = response
+        speak(response)
+    }
+
+    private fun speak(text: String) {
+        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "aura-response")
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            textToSpeech?.language = Locale("id", "ID")
+            textToSpeech?.setSpeechRate(0.95f)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        when (requestCode) {
+            cameraRequestCode -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                    startCamera()
+                } else {
+                    statusText.text = "Camera permission diperlukan untuk Cognitive Vision."
+                }
+            }
+            microphoneRequestCode -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                    startListening()
+                } else {
+                    statusText.text = "Microphone permission diperlukan untuk voice interface."
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        detector.close()
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        cameraExecutor.shutdown()
+        super.onDestroy()
     }
 }
