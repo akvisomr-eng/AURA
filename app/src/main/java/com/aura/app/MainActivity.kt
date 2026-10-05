@@ -9,6 +9,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -21,6 +22,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
@@ -53,7 +56,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     )
 
     @Volatile
-    private var latestScene = "Belum ada objek terdeteksi."
+    private var latestScene = "Saya sedang melihat lingkungan di depan Anda."
 
     private val listening = AtomicBoolean(false)
 
@@ -64,99 +67,141 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         ensureCamera()
     }
 
+    private fun dp(value: Float): Int =
+        (value * resources.displayMetrics.density + 0.5f).toInt()
+
+    private fun adaptiveScale(widthPx: Int): Float {
+        val widthDp = widthPx / resources.displayMetrics.density
+        return min(1.0f, max(0.82f, widthDp / 400f))
+    }
+
+    private fun roundedBackground(color: Int, radiusDp: Float) =
+        android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radiusDp).toFloat()
+        }
+
     private fun render() {
+        root = FrameLayout(this).apply {
+            setBackgroundColor(0xFF05070A.toInt())
+        }
+
         previewView = PreviewView(this).apply {
             implementationMode = PreviewView.ImplementationMode.PERFORMANCE
             scaleType = PreviewView.ScaleType.FILL_CENTER
             setBackgroundColor(0xFF05070A.toInt())
         }
+        root.addView(previewView, FrameLayout.LayoutParams(-1, -1))
 
-        val root = FrameLayout(this)
-
-        root.addView(
-            previewView,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        )
-
-        val topPanel = TextView(this).apply {
-            text = "AURA 1.8\nCOGNITIVE RUNTIME"
-            textSize = 20f
-            setTextColor(0xFF7FE7FF.toInt())
-            setPadding(28, 24, 28, 18)
-            setBackgroundColor(0xB805070A.toInt())
+        topPanel = TextView(this).apply {
+            text = "AURA 1.8  •  AKTIF"
+            textSize = 18f
+            maxLines = 2
+            setTextColor(0xFF8BEAFF.toInt())
+            setPadding(dp(18f), dp(12f), dp(18f), dp(12f))
+            background = roundedBackground(0xC905070A.toInt(), 18f)
+            gravity = Gravity.CENTER_VERTICAL
         }
-        root.addView(
-            topPanel,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.TOP }
-        )
 
         sceneText = TextView(this).apply {
-            textSize = 15f
-            setTextColor(0xFFE5EDF5.toInt())
-            setPadding(24, 14, 24, 14)
+            textSize = 16f
+            maxLines = 4
+            setTextColor(0xFFF2F7FA.toInt())
+            setPadding(dp(18f), dp(14f), dp(18f), dp(14f))
+            background = roundedBackground(0xD905070A.toInt(), 18f)
             text = latestScene
-            setBackgroundColor(0xB805070A.toInt())
         }
-        root.addView(
-            sceneText,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.BOTTOM
-                bottomMargin = 112
-            }
-        )
 
         statusText = TextView(this).apply {
             textSize = 13f
-            setTextColor(0xFFB8C4D0.toInt())
-            setPadding(24, 8, 24, 8)
-            text = "Menyiapkan kamera..."
-            setBackgroundColor(0xB805070A.toInt())
+            maxLines = 2
+            setTextColor(0xFFB9C6D0.toInt())
+            setPadding(dp(14f), dp(8f), dp(14f), dp(8f))
+            background = roundedBackground(0xB505070A.toInt(), 14f)
+            text = "Menyiapkan penglihatan AURA…"
         }
-        root.addView(
-            statusText,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.BOTTOM
-                bottomMargin = 72
-            }
-        )
 
         listenButton = TextView(this).apply {
             text = "●  BICARA DENGAN AURA"
-            textSize = 16f
+            textSize = 15f
+            maxLines = 1
             gravity = Gravity.CENTER
             setTextColor(0xFF061016.toInt())
-            setBackgroundColor(0xFF7FE7FF.toInt())
-            setPadding(24, 18, 24, 18)
+            background = roundedBackground(0xFF8BEAFF.toInt(), 22f)
+            setPadding(dp(18f), dp(14f), dp(18f), dp(14f))
             isClickable = true
             isFocusable = true
             setOnClickListener { toggleListening() }
         }
-        root.addView(
-            listenButton,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                64
-            ).apply {
-                gravity = Gravity.BOTTOM
-                leftMargin = 24
-                rightMargin = 24
-                bottomMargin = 16
-            }
-        )
+
+        root.addView(topPanel)
+        root.addView(sceneText)
+        root.addView(statusText)
+        root.addView(listenButton)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            updateResponsiveLayout(root.width, insets.getInsets(WindowInsetsCompat.Type.systemBars()))
+            insets
+        }
+
+        root.addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
+            updateResponsiveLayout(right - left, null)
+        }
 
         setContentView(root)
+    }
+
+    private fun updateResponsiveLayout(widthPx: Int, systemInsets: android.graphics.Insets?) {
+        if (widthPx <= 0) return
+        val scale = adaptiveScale(widthPx)
+        val widthDp = widthPx / resources.displayMetrics.density
+        val compact = widthDp < 360f
+        val horizontal = dp(if (compact) 12f else 18f)
+        val top = systemInsets?.top ?: 0
+        val bottom = systemInsets?.bottom ?: 0
+
+        topPanel.textSize = 17f * scale
+        sceneText.textSize = 16f * scale
+        statusText.textSize = 13f * scale
+        listenButton.textSize = 15f * scale
+
+        (topPanel.layoutParams as FrameLayout.LayoutParams).apply {
+            width = FrameLayout.LayoutParams.WRAP_CONTENT
+            height = FrameLayout.LayoutParams.WRAP_CONTENT
+            gravity = Gravity.TOP or Gravity.START
+            leftMargin = horizontal
+            topMargin = top + dp(10f)
+            topPanel.layoutParams = this
+        }
+
+        (sceneText.layoutParams as FrameLayout.LayoutParams).apply {
+            width = FrameLayout.LayoutParams.MATCH_PARENT
+            height = FrameLayout.LayoutParams.WRAP_CONTENT
+            gravity = Gravity.BOTTOM
+            leftMargin = horizontal
+            rightMargin = horizontal
+            bottomMargin = bottom + dp(if (compact) 92f else 104f)
+            sceneText.layoutParams = this
+        }
+
+        (statusText.layoutParams as FrameLayout.LayoutParams).apply {
+            width = FrameLayout.LayoutParams.WRAP_CONTENT
+            height = FrameLayout.LayoutParams.WRAP_CONTENT
+            gravity = Gravity.BOTTOM or Gravity.START
+            leftMargin = horizontal
+            bottomMargin = bottom + dp(if (compact) 68f else 78f)
+            statusText.layoutParams = this
+        }
+
+        (listenButton.layoutParams as FrameLayout.LayoutParams).apply {
+            width = FrameLayout.LayoutParams.MATCH_PARENT
+            height = dp(if (compact) 52f else 58f)
+            gravity = Gravity.BOTTOM
+            leftMargin = horizontal
+            rightMargin = horizontal
+            bottomMargin = bottom + dp(12f)
+            listenButton.layoutParams = this
+        }
     }
 
     private fun ensureCamera() {
@@ -174,7 +219,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     }
 
     private fun startCamera() {
-        statusText.text = "Kamera aktif • perception online"
+        statusText.text = "Penglihatan aktif • AURA sedang mengamati"
 
         val providerFuture = ProcessCameraProvider.getInstance(this)
         providerFuture.addListener({
@@ -214,22 +259,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         detector.process(image)
             .addOnSuccessListener { detectedObjects ->
                 if (detectedObjects.isEmpty()) {
-                    latestScene = "AURA melihat: belum ada objek yang dikenali."
+                    latestScene = "Saya belum mengenali objek yang cukup jelas."
                 } else {
                     val labels = detectedObjects.flatMap { obj ->
                         obj.labels.map { label -> label.text }
                     }.distinct().take(4)
 
                     latestScene = if (labels.isEmpty()) {
-                        "AURA melihat " + detectedObjects.size + " objek."
+                        "Saya melihat " + detectedObjects.size + " objek di depan Anda."
                     } else {
-                        "AURA melihat: " + labels.joinToString(", ")
+                        "Saya melihat " + labels.joinToString(", ") + "."
                     }
                 }
                 runOnUiThread { sceneText.text = latestScene }
             }
             .addOnFailureListener {
-                latestScene = "Vision aktif • menunggu hasil stabil."
+                latestScene = "Penglihatan aktif. Saya sedang menunggu hasil yang lebih stabil."
                 runOnUiThread { sceneText.text = latestScene }
             }
             .addOnCompleteListener {
@@ -242,7 +287,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
             speechRecognizer?.stopListening()
             listening.set(false)
             listenButton.text = "●  BICARA DENGAN AURA"
-            statusText.text = "Perception online"
+            statusText.text = "Penglihatan aktif • siap mendengarkan"
             return
         }
 
@@ -272,11 +317,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
                 override fun onReadyForSpeech(params: Bundle?) {
                     listening.set(true)
                     listenButton.text = "■  AURA MENDENGARKAN"
-                    statusText.text = "Mendengarkan..."
+                    statusText.text = "Silakan bicara dalam bahasa Indonesia…"
                 }
 
                 override fun onBeginningOfSpeech() {
-                    statusText.text = "Mendengarkan suara Anda..."
+                    statusText.text = "Saya mendengarkan…"
                 }
 
                 override fun onEndOfSpeech() {
@@ -297,7 +342,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
                 override fun onError(error: Int) {
                     listening.set(false)
                     listenButton.text = "●  BICARA DENGAN AURA"
-                    statusText.text = "Siap • tekan tombol untuk berbicara lagi"
+                    statusText.text = "Saya belum menangkapnya. Silakan coba lagi."
                 }
 
                 override fun onRmsChanged(rmsdB: Float) = Unit
@@ -325,13 +370,51 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     }
 
     private fun speak(text: String) {
-        textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "aura-response")
+        val naturalText = text
+            .replace("AURA 1.8 aktif.", "AURA satu titik delapan aktif.")
+            .replace("•", ", ")
+            .trim()
+
+        textToSpeech?.speak(
+            naturalText,
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            "aura-id-response"
+        )
     }
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            textToSpeech?.language = Locale("id", "ID")
-            textToSpeech?.setSpeechRate(0.95f)
+        if (status != TextToSpeech.SUCCESS) {
+            statusText.text = "Mesin suara belum siap."
+            return
+        }
+
+        val indonesia = Locale("id", "ID")
+        val result = textToSpeech?.setLanguage(indonesia)
+
+        val indonesianVoices = textToSpeech?.voices
+            ?.filter { it.locale.language == "id" }
+            .orEmpty()
+
+        val preferredVoice: Voice? =
+            indonesianVoices.firstOrNull {
+                it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NETWORK_SYNTHESIS) == true
+            } ?: indonesianVoices.firstOrNull()
+
+        if (preferredVoice != null) {
+            textToSpeech?.voice = preferredVoice
+        }
+
+        // Sedikit lebih lambat dan sedikit lebih tinggi agar percakapan terdengar
+        // lebih natural dalam bahasa Indonesia. Kualitas akhir tetap mengikuti
+        // mesin TTS/voice Indonesia yang terpasang di perangkat.
+        textToSpeech?.setSpeechRate(0.91f)
+        textToSpeech?.setPitch(1.02f)
+
+        if (result == TextToSpeech.LANG_MISSING_DATA ||
+            result == TextToSpeech.LANG_NOT_SUPPORTED
+        ) {
+            statusText.text = "Suara Indonesia belum tersedia di mesin TTS perangkat."
         }
     }
 
