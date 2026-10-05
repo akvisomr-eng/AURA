@@ -1,0 +1,91 @@
+name: AURA Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      play_track:
+        description: "Google Play track (internal/alpha/beta/production)"
+        required: false
+        default: "internal"
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ""
+
+      - name: Install Android SDK
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Validate project
+        run: |
+          gradle projects --no-daemon
+          gradle test --no-daemon
+          gradle lint --no-daemon
+
+      - name: Decode release keystore
+        if: ${{ secrets.AURA_KEYSTORE_B64 != '' }}
+        env:
+          AURA_KEYSTORE_B64: ${{ secrets.AURA_KEYSTORE_B64 }}
+        run: echo "$AURA_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/aura-upload.jks"
+
+      - name: Build unsigned release when no key is configured
+        if: ${{ secrets.AURA_KEYSTORE_B64 == '' }}
+        run: gradle assembleRelease bundleRelease --no-daemon
+
+      - name: Build signed release
+        if: ${{ secrets.AURA_KEYSTORE_B64 != '' }}
+        env:
+          AURA_KEYSTORE_PASSWORD: ${{ secrets.AURA_KEYSTORE_PASSWORD }}
+          AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
+          AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
+        run: |
+          gradle assembleRelease bundleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/aura-upload.jks" \
+            -Pandroid.injected.signing.store.password="$AURA_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$AURA_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$AURA_KEY_PASSWORD"
+
+      - name: Upload APK/AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-1.6.4-release
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Upload to Google Play
+        if: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' && secrets.AURA_KEYSTORE_B64 != '' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.aura.app
+          releaseFiles: app/build/outputs/bundle/release/*.aab
+          track: ${{ inputs.play_track || 'internal' }}
