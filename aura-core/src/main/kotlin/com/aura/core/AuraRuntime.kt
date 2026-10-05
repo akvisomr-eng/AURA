@@ -87,25 +87,25 @@ class AuraRuntime(
         val intent = router.route(userText)
         val response = when (intent) {
             AuraIntent.GREETING ->
-                "Halo. AURA aktif dan siap membantu."
+                "Halo. Saya AURA. Saya siap membantu Anda."
             AuraIntent.VISION_QUERY ->
-                if (visionContext.isBlank()) "Saya belum mendapatkan konteks visual." else visionContext
+                if (visionContext.isBlank()) "Saya belum mendapatkan gambaran yang cukup jelas. Coba arahkan kamera ke objek yang ingin Anda tanyakan." else visionContext
             AuraIntent.STATUS_QUERY ->
-                "AURA 1.8 aktif. Vision, voice, memory sesi, dan agent router siap."
+                "Saya aktif. Penglihatan, suara, ingatan percakapan, dan pengarah tugas saya siap digunakan."
             AuraIntent.MEMORY_QUERY -> {
                 val remembered = memory.recent(4)
                     .filter { it.role == "user" }
                     .map { it.text }
                 if (remembered.isEmpty()) {
-                    "Belum ada percakapan yang saya simpan dalam sesi ini."
+                    "Belum ada percakapan yang saya ingat dalam sesi ini."
                 } else {
-                    "Dalam sesi ini saya mengingat: " + remembered.joinToString(" • ")
+                    "Sejauh ini, saya ingat Anda mengatakan: " + remembered.joinToString(" • ")
                 }
             }
             AuraIntent.HELP ->
-                "Saya dapat melihat melalui kamera, mendengar suara Anda, menjawab dengan suara, dan mempertahankan memory selama sesi."
+                "Saya bisa melihat melalui kamera, mendengarkan Anda, menjawab dengan suara, dan mengingat percakapan selama sesi ini."
             AuraIntent.UNKNOWN ->
-                "Saya memahami Anda mengatakan: $userText. Agent berikutnya akan menghubungkan kemampuan ini ke tindakan dan layanan."
+                "Baik, saya mengerti. Anda mengatakan: $userText. Saya akan menghubungkan permintaan ini ke kemampuan yang sesuai."
         }
 
         memory.add("user", userText)
