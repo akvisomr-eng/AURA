@@ -22,6 +22,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.mlkit.vision.common.InputImage
@@ -151,7 +152,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         setContentView(root)
     }
 
-    private fun updateResponsiveLayout(widthPx: Int, systemInsets: android.graphics.Insets?) {
+    private fun updateResponsiveLayout(widthPx: Int, systemInsets: Insets?) {
         if (widthPx <= 0) return
         val scale = adaptiveScale(widthPx)
         val widthDp = widthPx / resources.displayMetrics.density
