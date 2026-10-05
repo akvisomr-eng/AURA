@@ -1,6 +1,7 @@
 package com.aura.app
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -194,6 +195,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         }, ContextCompat.getMainExecutor(this))
     }
 
+    @SuppressLint("UnsafeOptInUsageError")
     @OptIn(ExperimentalGetImage::class)
     private fun analyzeFrame(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image ?: run {
