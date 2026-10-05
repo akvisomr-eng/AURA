@@ -17,14 +17,14 @@ class IndonesianVoiceRuntime {
         val spoken = text
             .replace("AURA 1.9 aktif.", "AURA satu titik sembilan aktif.")
             .replace("AURA 1.8 aktif.", "AURA satu titik delapan aktif.")
-            .replace(Regex("\s*[•·]\s*"), ", ")
-            .replace(Regex("\s+"), " ")
+            .replace(Regex("""\s*[•·]\s*"""), ", ")
+            .replace(Regex("""\s+"""), " ")
             .trim()
 
         // Small conversational pauses improve intelligibility without requiring
         // a specific TTS engine. The provider remains replaceable.
         val natural = spoken
-            .replace(Regex("([.!?])\s+"), "$1 ")
+            .replace(Regex("""([.!?])\s+"""), "$1 ")
             .replace("Saya AURA.", "Saya AURA.")
         return SpokenTurn(natural)
     }
