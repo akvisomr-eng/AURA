@@ -8,6 +8,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.Voice
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -30,12 +31,16 @@ import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.aura.core.AuraRuntime
 import java.util.Locale
+import kotlin.math.max
+import kotlin.math.min
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
+    private lateinit var root: FrameLayout
     private lateinit var previewView: PreviewView
+    private lateinit var topPanel: TextView
     private lateinit var statusText: TextView
     private lateinit var sceneText: TextView
     private lateinit var listenButton: TextView
