@@ -98,22 +98,25 @@ class AuraContextOptimizer(
     private val maxChars: Int = 24_000
 ) {
     fun optimize(messages: List<Pair<String, String>>): List<Pair<String, String>> {
-        if (messages.sumOf { it.second.length } <= maxChars) return messages
-        if (messages.isEmpty()) return messages
+        if (messages.isEmpty() || messages.sumOf { it.second.length } <= maxChars) return messages
 
+        val selected = LinkedHashMap<Int, Pair<String, String>>()
         val first = messages.first()
-        val tail = messages.drop(1).asReversed()
-        val selected = ArrayDeque<Pair<String, String>>()
-        selected.addFirst(first)
-        var used = first.second.length
-        for (message in tail) {
+        val firstText = first.second.take(maxChars)
+        selected[0] = first.first to firstText
+        var used = firstText.length
+
+        for (index in messages.lastIndex downTo 1) {
             val remaining = maxChars - used
             if (remaining <= 0) break
-            val text = message.second
-            val kept = if (text.length <= remaining) text else text.take(remaining)
-            selected.addFirst(message.first to kept)
-            used += kept.length
+            val message = messages[index]
+            val kept = message.second.take(remaining)
+            if (kept.isNotEmpty()) {
+                selected[index] = message.first to kept
+                used += kept.length
+            }
         }
-        return selected.toList()
+
+        return selected.toSortedMap().values.toList()
     }
 }
