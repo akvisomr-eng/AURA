@@ -104,7 +104,7 @@ class AuraAutoRouter(private val catalog: AuraModelCatalog = DefaultAuraModelCat
         "Mode ${mode.name.lowercase()} memilih ${model.providerId}/${model.modelId} berdasarkan health=${"%.2f".format(model.health)}, latency=${model.latencyMs}ms, quota=${"%.0f".format(model.quotaRemaining * 100)}%."
 }
 
-data class AuraGatewayConfig(val baseUrl: String = "", val apiKey: String = "", val timeoutMs: Int = 20_000) {
+class AuraOmniRouteCatalog : AuraModelCatalog {\n    override fun models(): List<AuraModelProfile> = listOf(\n        AuraModelProfile(\n            providerId = "omniroute", modelId = "auto", quality = 0.90, latencyMs = 900,\n            costPer1kTokensUsd = 0.0, quotaRemaining = 1.0, health = 1.0, taskFit = 0.92,\n            supportsVision = true, supportsIndonesian = true\n        )\n    )\n}\n\ndata class AuraGatewayConfig(val baseUrl: String = "", val apiKey: String = "", val timeoutMs: Int = 20_000) {
     val enabled: Boolean get() = baseUrl.isNotBlank()
 }
 
