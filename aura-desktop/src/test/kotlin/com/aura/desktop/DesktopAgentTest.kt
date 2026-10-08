@@ -26,7 +26,7 @@ class DesktopAgentTest {
     @Test
     fun workspaceSearchFindsMatchingLines() {
         val root = Files.createTempDirectory("aura-search")
-        Files.writeString(root.resolve("notes.md"), "AURA workspace\\nagent runtime\\n")
+        Files.writeString(root.resolve("notes.md"), "AURA workspace\nagent runtime\n")
         val hits = DesktopCapabilities().searchWorkspace(root, "agent")
         assertEquals(1, hits.size)
         assertEquals("notes.md", hits.first().path)
