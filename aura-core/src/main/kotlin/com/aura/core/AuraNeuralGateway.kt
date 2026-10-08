@@ -69,13 +69,13 @@ class AuraAutoRouter(private val catalog: AuraModelCatalog = DefaultAuraModelCat
             .filter { request.maxCostUsd == null || it.costPer1kTokensUsd * max(1, request.estimatedInputTokens) / 1000.0 <= request.maxCostUsd }
         if (pool.isEmpty()) return AuraRoutingDecision(null, emptyList(), "Tidak ada model yang memenuhi policy AURA.", emptyList())
         val ranked = pool.sortedByDescending { score(it, request) }
-        val sticky = lastKnownGood?.let { key -> ranked.firstOrNull { "\${it.providerId}/\${it.modelId}" == key } }
+        val sticky = lastKnownGood?.let { key -> ranked.firstOrNull { "${it.providerId}/${it.modelId}" == key } }
         val selected = sticky ?: ranked.first()
         val chain = listOf(selected) + ranked.filter { it != selected }
         return AuraRoutingDecision(selected, ranked, reasonFor(request.mode, selected), chain)
     }
 
-    fun markSuccess(model: AuraModelProfile) { lastKnownGood = "\${model.providerId}/\${model.modelId}" }
+    fun markSuccess(model: AuraModelProfile) { lastKnownGood = "${model.providerId}/${model.modelId}" }
 
     private fun score(model: AuraModelProfile, request: AuraRoutingRequest): Double {
         val latency = 1.0 - min(1.0, model.latencyMs / 5000.0)
@@ -101,7 +101,7 @@ class AuraAutoRouter(private val catalog: AuraModelCatalog = DefaultAuraModelCat
     }
 
     private fun reasonFor(mode: AuraRoutingMode, model: AuraModelProfile): String =
-        "Mode \${mode.name.lowercase()} memilih \${model.providerId}/\${model.modelId} berdasarkan health=\${"%.2f".format(model.health)}, latency=\${model.latencyMs}ms, quota=\${"%.0f".format(model.quotaRemaining * 100)}%."
+        "Mode ${mode.name.lowercase()} memilih ${model.providerId}/${model.modelId} berdasarkan health=${"%.2f".format(model.health)}, latency=${model.latencyMs}ms, quota=${"%.0f".format(model.quotaRemaining * 100)}%."
 }
 
 data class AuraGatewayConfig(val baseUrl: String = "", val apiKey: String = "", val timeoutMs: Int = 20_000) {
@@ -132,7 +132,7 @@ class AuraNeuralGateway(
                         callback(AuraGatewayResult.Success(result, decision.copy(selected = candidate)))
                         return@execute
                     }
-                    lastError = "Respons kosong dari \${candidate.modelId}."
+                    lastError = "Respons kosong dari ${candidate.modelId}."
                 } catch (e: Exception) { lastError = e.message ?: "Kesalahan gateway." }
             }
             callback(AuraGatewayResult.Failure(lastError, decision))
@@ -144,16 +144,16 @@ class AuraNeuralGateway(
         val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"; connectTimeout = config.timeoutMs; readTimeout = config.timeoutMs; doOutput = true
             setRequestProperty("Content-Type", "application/json")
-            if (config.apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer \${config.apiKey}")
+            if (config.apiKey.isNotBlank()) setRequestProperty("Authorization", "Bearer ${config.apiKey}")
         }
-        val payloadMessages = messages.joinToString(",") { """{"role":"\${jsonEscape(it.first)}","content":"\${jsonEscape(it.second)}"}""" }
-        val body = """{"model":"\${jsonEscape(model.modelId)}","messages":[$payloadMessages],"stream":false}"""
+        val payloadMessages = messages.joinToString(",") { """{"role":"${jsonEscape(it.first)}","content":"${jsonEscape(it.second)}"}""" }
+        val body = """{"model":"${jsonEscape(model.modelId)}","messages":[$payloadMessages],"stream":false}"""
         connection.outputStream.use { it.write(body.toByteArray(StandardCharsets.UTF_8)) }
         val status = connection.responseCode
         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
         val response = BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
         connection.disconnect()
-        if (status !in 200..299) throw IllegalStateException("HTTP $status: \${response.take(300)}")
+        if (status !in 200..299) throw IllegalStateException("HTTP $status: ${response.take(300)}")
         return extractAssistantContent(response)
     }
 
