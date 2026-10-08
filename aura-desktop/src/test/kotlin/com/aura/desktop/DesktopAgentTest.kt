@@ -36,9 +36,9 @@ class DesktopAgentTest {
     @Test
     fun approvedCommandCapturesExitCodeAndOutput() {
         val root = Files.createTempDirectory("aura-command")
-        val result = DesktopCapabilities().runApprovedCommand(root, "cmd", "/c", "echo", "AURA")
+        val result = DesktopCapabilities().runApprovedCommand(root, "java", "-version")
         assertEquals(0, result.exitCode)
-        assertTrue(result.output.contains("AURA"))
+        assertTrue(result.output.contains("version") || result.output.contains("Version"))
     }
 
     @Test
