@@ -7,11 +7,14 @@ kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation(project(":aura-core"))
+    testImplementation(kotlin("test"))
 }
 
 application {
     mainClass.set("com.aura.desktop.AuraDesktopKt")
 }
+
+tasks.test { useJUnitPlatform() }
 
 tasks.jar {
     manifest {
