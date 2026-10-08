@@ -58,4 +58,13 @@ class DesktopAgentTest {
         assertEquals(1, matches.size)
         assertEquals("architecture.md", matches.first().path)
     }
+    @Test
+    fun workspaceStatePersistsAndRestores() {
+        val state = WorkspaceState()
+        val path = Files.createTempDirectory("aura-workspace").toAbsolutePath().toString()
+        state.save(path)
+        assertEquals(path, state.load())
+        state.clear()
+    }
+
 }
