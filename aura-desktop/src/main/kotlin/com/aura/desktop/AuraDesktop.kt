@@ -12,11 +12,17 @@ import java.awt.Dimension
 import java.awt.Font
 import java.awt.GridLayout
 import java.awt.Insets
+import java.awt.SystemTray
+import java.awt.TrayIcon
+import java.awt.PopupMenu
+import java.awt.MenuItem
 import java.nio.file.Files
 import java.util.concurrent.Executors
 import javax.swing.*
 
 private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
+    private var trayIcon: TrayIcon? = null
+    private var keepReady = true
     private val runtime = AuraRuntime()
     private val executor = Executors.newCachedThreadPool()
     private val transcript = JTextArea()
@@ -26,7 +32,10 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private val gatewayKey = JTextField(System.getenv("AURA_GATEWAY_KEY") ?: "")
 
     init {
-        defaultCloseOperation = EXIT_ON_CLOSE
+        defaultCloseOperation = DO_NOTHING_ON_CLOSE
+        addWindowListener(object : java.awt.event.WindowAdapter() {
+            override fun windowClosing(e: java.awt.event.WindowEvent) { minimizeToTray() }
+        })
         minimumSize = Dimension(900, 620)
         setSize(1100, 720)
         setLocationRelativeTo(null)
@@ -43,10 +52,12 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val openFile = JButton("Buka Dokumen")
         val readFile = JButton("Baca File")
         val runtimeStatus = JButton("Status")
+        val tray = JButton("Ke Tray")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
         runtimeStatus.addActionListener { appendAura("Status: " + runtime.status()) }
-        tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus)
+        tray.addActionListener { minimizeToTray() }
+        tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus); tools.add(tray)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -74,6 +85,57 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
 
         appendAura("Halo. Saya AURA. Saya siap membantu pekerjaan Anda di Windows.")
         appendAura("Mode lokal aktif. Gateway dapat digunakan bila URL dikonfigurasi.")
+        setupTray()
+    }
+
+    private fun setupTray() {
+        if (!SystemTray.isSupported()) {
+            appendAura("System tray tidak tersedia di lingkungan ini; AURA tetap dapat digunakan normal.")
+            return
+        }
+        val menu = PopupMenu()
+        val show = MenuItem("Buka AURA")
+        val ready = MenuItem("Always-ready: AKTIF")
+        val exit = MenuItem("Keluar AURA")
+        show.addActionListener { restoreFromTray() }
+        ready.addActionListener {
+            keepReady = !keepReady
+            ready.label = if (keepReady) "Always-ready: AKTIF" else "Always-ready: NONAKTIF"
+        }
+        exit.addActionListener {
+            keepReady = false
+            trayIcon?.let { SystemTray.getSystemTray().remove(it) }
+            executor.shutdownNow()
+            dispose()
+            System.exit(0)
+        }
+        menu.add(show); menu.add(ready); menu.addSeparator(); menu.add(exit)
+        val image = java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        g.font = Font(Font.SANS_SERIF, Font.BOLD, 20)
+        g.drawString("A", 7, 23)
+        g.dispose()
+        trayIcon = TrayIcon(image, "AURA — Work Companion", menu).apply {
+            isImageAutoSize = true
+            addActionListener { restoreFromTray() }
+        }
+        runCatching { SystemTray.getSystemTray().add(trayIcon) }
+    }
+
+    private fun minimizeToTray() {
+        if (keepReady && trayIcon != null) {
+            isVisible = false
+            trayIcon?.displayMessage("AURA", "AURA tetap aktif dan siap menerima pekerjaan.", TrayIcon.MessageType.INFO)
+        } else {
+            dispose()
+        }
+    }
+
+    private fun restoreFromTray() {
+        isVisible = true
+        state = NORMAL
+        toFront()
+        requestFocus()
     }
 
     private fun sendMessage() {
