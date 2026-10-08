@@ -29,10 +29,10 @@ jobs:
           gradle-version: "8.9"
       - name: Test AURA Core
         shell: pwsh
-        run: ./gradlew :aura-core:test --no-daemon
+        run: gradle :aura-core:test --no-daemon
       - name: Build Windows distribution
         shell: pwsh
-        run: ./gradlew :aura-desktop:installDist --no-daemon
+        run: gradle :aura-desktop:installDist --no-daemon
       - name: Package Windows app image
         shell: pwsh
         run: jpackage --type app-image --name AURA --input aura-desktop/build/install/aura-desktop/lib --main-jar aura-desktop.jar --main-class com.aura.desktop.AuraDesktopKt --dest aura-desktop/build/jpackage
