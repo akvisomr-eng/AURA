@@ -71,6 +71,10 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val diffButton = JButton("Git Diff")
         val commandButton = JButton("Jalankan Task")
         val copyButton = JButton("Salin Ringkasan")
+        val fileSearchButton = JButton("Cari File")
+        val readDocButton = JButton("Baca Dokumen")
+        val buildButton = JButton("Build/Test Project")
+        val structureButton = JButton("Struktur Project")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
         runtimeStatus.addActionListener { appendAura("Status: " + runtime.status()) }
@@ -87,10 +91,15 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         diffButton.addActionListener { showGitDiff() }
         commandButton.addActionListener { runTaskWithApproval() }
         copyButton.addActionListener { desktop.copyToClipboard(transcript.text); appendAura("Ringkasan percakapan disalin ke clipboard.") }
+        fileSearchButton.addActionListener { searchFiles() }
+        readDocButton.addActionListener { readDocument() }
+        buildButton.addActionListener { runRecommendedBuild() }
+        structureButton.addActionListener { showProjectStructure() }
         tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus); tools.add(tray)
         tools.add(workspaceButton); tools.add(gitButton); tools.add(clipboardButton); tools.add(openWorkspace)
         tools.add(projectButton); tools.add(screenButton); tools.add(approvalButton); tools.add(launchButton)
         tools.add(searchButton); tools.add(diffButton); tools.add(commandButton); tools.add(copyButton)
+        tools.add(fileSearchButton); tools.add(readDocButton); tools.add(buildButton); tools.add(structureButton)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -265,6 +274,66 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
             SwingUtilities.invokeLater {
                 result.onSuccess { s -> appendAura("Git workspace: ${s.root}\nBranch: ${s.branch}\nStatus:\n${s.status}\nCommit terakhir:\n${s.recentCommits.joinToString("\n")}") }
                     .onFailure { appendAura("Git belum tersedia di workspace: ${it.message}") }
+            }
+        }
+    }
+
+    private fun searchFiles() {
+        val root = workspace ?: run { appendAura("Pilih workspace terlebih dahulu."); return }
+        val query = JOptionPane.showInputDialog(this, "Nama file yang dicari:", "File Intelligence", JOptionPane.PLAIN_MESSAGE) ?: return
+        if (query.isBlank()) return
+        executor.execute {
+            val result = runCatching { desktop.findFiles(root, query) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { files ->
+                    if (files.isEmpty()) appendAura("File tidak ditemukan: $query")
+                    else appendAura("File ditemukan:\\n" + files.joinToString("\\n") { "${it.path} (${it.sizeBytes} B)" })
+                }.onFailure { appendAura("Pencarian file gagal: ${it.message}") }
+            }
+        }
+    }
+
+    private fun readDocument() {
+        val chooser = JFileChooser()
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return
+        val file = chooser.selectedFile.toPath()
+        val result = runCatching { desktop.readDocument(file) }
+        result.onSuccess { doc -> appendAura("Dokumen: ${doc.name}\n${doc.content}") }
+            .onFailure { appendAura("Dokumen belum didukung: ${it.message}") }
+    }
+
+    private fun showProjectStructure() {
+        val root = workspace ?: run { appendAura("Pilih workspace terlebih dahulu."); return }
+        executor.execute {
+            val result = runCatching { project.profile(root) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { p -> appendAura("Struktur Project:\\nJenis: ${p.kind}\nFolder utama: ${p.keyDirectories.joinToString(", ").ifBlank { "tidak ada" }}") }
+                    .onFailure { appendAura("Struktur project gagal: ${it.message}") }
+            }
+        }
+    }
+
+    private fun runRecommendedBuild() {
+        val root = workspace ?: run { appendAura("Pilih workspace terlebih dahulu."); return }
+        val build = runCatching { project.recommendedBuild(root) }.getOrElse {
+            appendAura("Build Intelligence gagal: ${it.message}"); return
+        }
+        if (build.command.isEmpty()) {
+            appendAura(build.rationale); return
+        }
+        val commandText = build.command.joinToString(" ")
+        val request = approvals.classify("jalankan build test $commandText")
+        val approved = JOptionPane.showConfirmDialog(this, "AURA mendeteksi:\n$commandText\n\nAlasan: ${build.rationale}\n\nJalankan?", "Build/Test Approval", JOptionPane.YES_NO_OPTION)
+        if (approved != JOptionPane.YES_OPTION) { appendAura("Build/Test dibatalkan."); return }
+        status.text = "Build/Test berjalan..."
+        executor.execute {
+            val result = runCatching { desktop.runApprovedCommand(root, *build.command.toTypedArray()) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { r ->
+                    val state = if (r.exitCode == 0) "BERHASIL" else "GAGAL"
+                    appendAura("Build Intelligence — $state (exit ${r.exitCode})\\n${r.output}")
+                    status.text = "AURA siap."
+                }.onFailure { appendAura("Build/Test gagal dijalankan: ${it.message}"); status.text = "AURA siap." }
             }
         }
     }
