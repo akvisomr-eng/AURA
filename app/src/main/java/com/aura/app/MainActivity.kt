@@ -50,6 +50,7 @@ import kotlin.math.min
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
+// CI trigger: keep Android pipeline aligned with desktop runtime fixes.
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
     private lateinit var root: FrameLayout
