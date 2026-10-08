@@ -22,4 +22,22 @@ class DesktopAgentTest {
         assertEquals(1, profile.sourceFiles)
         assertTrue(profile.buildFiles.contains("build.gradle.kts"))
     }
+
+    @Test
+    fun workspaceSearchFindsMatchingLines() {
+        val root = Files.createTempDirectory("aura-search")
+        Files.writeString(root.resolve("notes.md"), "AURA workspace\\nagent runtime\\n")
+        val hits = DesktopCapabilities().searchWorkspace(root, "agent")
+        assertEquals(1, hits.size)
+        assertEquals("notes.md", hits.first().path)
+        assertEquals(2, hits.first().line)
+    }
+
+    @Test
+    fun approvedCommandCapturesExitCodeAndOutput() {
+        val root = Files.createTempDirectory("aura-command")
+        val result = DesktopCapabilities().runApprovedCommand(root, "cmd", "/c", "echo", "AURA")
+        assertEquals(0, result.exitCode)
+        assertTrue(result.output.contains("AURA"))
+    }
 }
