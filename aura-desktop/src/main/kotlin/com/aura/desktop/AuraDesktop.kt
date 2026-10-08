@@ -35,6 +35,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private val screen = ScreenIntelligence()
     private val project = ProjectIntelligence()
     private val approvals = ApprovalEngine()
+    private val workspaceState = WorkspaceState()
     private var workspace: Path? = null
 
     init {
@@ -127,6 +128,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
 
         appendAura("Halo. Saya AURA. Saya siap membantu pekerjaan Anda di Windows.")
         appendAura("Mode lokal aktif. Gateway dapat digunakan bila URL dikonfigurasi.")
+        restoreWorkspace()
         setupTray()
     }
 
@@ -257,11 +259,22 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         appendAura(if (desktop.openApplication(command)) "Aplikasi dijalankan: $command" else "Gagal menjalankan: $command")
     }
 
+    private fun restoreWorkspace() {
+        val saved = workspaceState.load()?.let { Path.of(it) }
+        if (saved != null && Files.isDirectory(saved)) {
+            workspace = saved
+            appendAura("Workspace terakhir dipulihkan: $saved")
+        } else if (saved != null) {
+            workspaceState.clear()
+        }
+    }
+
     private fun chooseWorkspace() {
         val chooser = JFileChooser()
         chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return
         workspace = chooser.selectedFile.toPath()
+        workspaceState.save(workspace!!.toAbsolutePath().toString())
         val entries = runCatching { desktop.inspectFolder(workspace!!) }.getOrNull()
         if (entries == null) appendAura("Workspace tidak dapat dibaca.")
         else appendAura("Workspace aktif: ${workspace}\n${entries.joinToString("\n") { (if (it.directory) "[DIR] " else "[FILE] ") + it.name }}")
