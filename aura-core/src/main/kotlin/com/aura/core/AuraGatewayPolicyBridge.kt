@@ -1,7 +1,7 @@
 package com.aura.core
 
 class AuraGatewayPolicyBridge(
-    private val gateways: Map<String, AuraModelGateway>,
+    private val gateways: Map<String, AuraNineRouterAdapter>,
     private val policy: AuraNeuralPolicy = AuraNeuralPolicy(
         AuraGatewayProviderRegistry()
     )
@@ -17,7 +17,12 @@ class AuraGatewayPolicyBridge(
         val route = policy.choose(task, context, estimatedTokens, maxCostUsd)
         val selected = route.selected
         if (selected == null) {
-            callback(AuraGatewayResult.Failure(route.explanation, AuraRoutingDecision(null, emptyList(), route.explanation, emptyList())))
+            callback(
+                AuraGatewayResult.Failure(
+                    route.explanation,
+                    AuraRoutingDecision(null, emptyList(), route.explanation, emptyList())
+                )
+            )
             return
         }
 
@@ -37,20 +42,7 @@ class AuraGatewayPolicyBridge(
         if (index >= ordered.size) {
             val decision = AuraRoutingDecision(
                 selected = null,
-                candidates = ordered.map {
-                    AuraModelProfile(
-                        providerId = it.providerId,
-                        modelId = it.modelId,
-                        quality = it.quality,
-                        latencyMs = it.health.latencyMs,
-                        costPer1kTokensUsd = it.costPer1kTokensUsd,
-                        quotaRemaining = it.health.quotaRemaining,
-                        health = it.health.health,
-                        taskFit = it.quality,
-                        supportsVision = AuraCapability.VISION in it.capabilities,
-                        supportsIndonesian = true
-                    )
-                },
+                candidates = ordered.map(::toModelProfile),
                 reason = policyExplanation,
                 fallbackChain = emptyList()
             )
@@ -65,42 +57,62 @@ class AuraGatewayPolicyBridge(
             return
         }
 
-        val started = System.nanoTime()
-        try {
-            val response = gateway.complete(
-                AuraModelRequest(
-                    model = profile.modelId,
-                    messages = AuraContextOptimizer().optimize(messages),
-                    maxTokens = (messages.sumOf { it.second.length } / 4 * 2).coerceAtLeast(256)
-                )
-            )
-            val elapsed = (System.nanoTime() - started) / 1_000_000L
-            callback(
-                AuraGatewayResult.Success(
-                    text = response.text,
-                    decision = AuraRoutingDecision(
-                        selected = AuraModelProfile(
-                            providerId = profile.providerId,
-                            modelId = response.model,
-                            quality = profile.quality,
-                            latencyMs = elapsed,
-                            costPer1kTokensUsd = profile.costPer1kTokensUsd,
-                            quotaRemaining = profile.health.quotaRemaining,
-                            health = profile.health.health,
-                            taskFit = profile.quality,
-                            supportsVision = AuraCapability.VISION in profile.capabilities,
-                            supportsIndonesian = true
-                        ),
-                        candidates = emptyList(),
-                        reason = policyExplanation,
-                        fallbackChain = ordered.drop(index + 1).map { AuraModelProfile(providerId = it.providerId, modelId = it.modelId, quality = it.quality, latencyMs = it.health.latencyMs, costPer1kTokensUsd = it.costPer1kTokensUsd, quotaRemaining = it.health.quotaRemaining, health = it.health.health, taskFit = it.quality, supportsVision = AuraCapability.VISION in it.capabilities, supportsIndonesian = true) }
+        val request = AuraRoutingRequest(
+            task = task,
+            mode = when (task) {
+                AuraTaskType.FAST -> AuraRoutingMode.FAST
+                else -> AuraRoutingMode.BALANCED
+            },
+            estimatedInputTokens = messages.sumOf { it.second.length } / 4,
+            maxCostUsd = null,
+            requiresVision = AuraCapability.VISION in context.requiredCapabilities,
+            requiresIndonesian = true
+        )
+
+        gateway.execute(request, AuraContextOptimizer().optimize(messages)) { result ->
+            when (result) {
+                is AuraGatewayResult.Success -> {
+                    val selectedProfile = result.decision.selected ?: toModelProfile(profile)
+                    callback(
+                        AuraGatewayResult.Success(
+                            text = result.text,
+                            decision = AuraRoutingDecision(
+                                selected = selectedProfile,
+                                candidates = emptyList(),
+                                reason = policyExplanation,
+                                fallbackChain = ordered.drop(index + 1).map(::toModelProfile)
+                            )
+                        )
                     )
-                )
-            )
-        } catch (error: Exception) {
-            executeNext(ordered, index + 1, task, messages, context, callback, policyExplanation)
+                }
+                is AuraGatewayResult.Failure -> {
+                    executeNext(
+                        ordered,
+                        index + 1,
+                        task,
+                        messages,
+                        context,
+                        callback,
+                        policyExplanation
+                    )
+                }
+            }
         }
     }
+
+    private fun toModelProfile(profile: AuraRoutingProfile): AuraModelProfile =
+        AuraModelProfile(
+            providerId = profile.providerId,
+            modelId = profile.modelId,
+            quality = profile.quality,
+            latencyMs = profile.health.latencyMs,
+            costPer1kTokensUsd = profile.costPer1kTokensUsd,
+            quotaRemaining = profile.health.quotaRemaining,
+            health = profile.health.health,
+            taskFit = profile.quality,
+            supportsVision = AuraCapability.VISION in profile.capabilities,
+            supportsIndonesian = true
+        )
 }
 
 class AuraGatewayProviderRegistry : AuraProviderRegistry {
