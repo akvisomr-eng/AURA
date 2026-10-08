@@ -6,7 +6,6 @@ import java.awt.datatransfer.DataFlavor
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 
 data class WorkspaceEntry(
     val name: String,
@@ -103,7 +102,7 @@ class DesktopCapabilities {
         val results = mutableListOf<SearchResult>()
         Files.walk(root).use { stream ->
             stream.filter { Files.isRegularFile(it) }
-                .filter { !it.toString().contains(${java.io.File.separator} + ".git" + ${java.io.File.separator}) }
+                .filter { !it.toString().contains(File.separator + ".git" + File.separator) }
                 .filter { it.fileName.toString().substringAfterLast('.', "").lowercase() in
                     setOf("txt","md","json","xml","yaml","yml","toml","kt","kts","java","py","js","ts","tsx","jsx","html","css","sql","csv","gradle","properties") }
                 .forEach { file ->
