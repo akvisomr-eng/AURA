@@ -45,6 +45,7 @@ data class TextDocument(
 )
 
 class DesktopCapabilities {
+    // CI trigger: validated desktop capability surface.
     fun inspectFolder(folder: Path, limit: Int = 80): List<WorkspaceEntry> {
         require(Files.isDirectory(folder)) { "Folder tidak ditemukan: $folder" }
         return Files.list(folder).use { stream ->
