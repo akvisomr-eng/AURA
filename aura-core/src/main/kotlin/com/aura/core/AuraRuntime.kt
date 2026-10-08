@@ -63,7 +63,9 @@ class AuraRuntime(
     private val personalityEngine: PersonalityEngine = PersonalityEngine(),
     private val capabilityEngine: CapabilityEngine = CapabilityEngine(),
     private val selfModel: AuraSelfModel = AuraSelfModel(),
-    private val worldModel: AuraWorldModel = AuraWorldModel()
+    private val worldModel: AuraWorldModel = AuraWorldModel(),
+    private val knowledgeFabric: AuraKnowledgeFabric = AuraKnowledgeFabric(),
+    private val agentOrchestrator: AuraAgentOrchestrator = AuraAgentOrchestrator()
 ) {
     private var affectiveState = AffectiveState()
 
@@ -76,6 +78,20 @@ class AuraRuntime(
     fun selfModel(): AuraSelfModel = selfModel
     fun worldModel(): AuraWorldModel = worldModel
     fun capabilities(): List<CapabilityManifest> = capabilityEngine.all()
+
+    fun cognitivePlan(userText: String): AuraCognitiveDecision {
+        val intent = router.route(userText)
+        val context = knowledgeFabric.context(
+            userText = userText,
+            intent = intent,
+            memory = memory.recent(12),
+            world = worldModel.snapshot(),
+            affectiveState = affectiveState
+        )
+        return agentOrchestrator.plan(context)
+    }
+
+    fun knowledge(limit: Int = 8): List<AuraKnowledgeItem> = knowledgeFabric.recentKnowledge(limit)
 
     fun respond(userText: String, visionContext: String): AuraTurn {
         val intent = router.route(userText)
