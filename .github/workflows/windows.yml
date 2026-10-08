@@ -1,5 +1,7 @@
 name: AURA Windows
 
+# Desktop packaging workflow
+
 on:
   workflow_dispatch:
   push:
