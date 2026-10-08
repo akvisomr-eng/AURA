@@ -33,6 +33,18 @@ data class CommandResult(
     val output: String
 )
 
+data class FileMatch(
+    val path: String,
+    val sizeBytes: Long,
+    val extension: String
+)
+
+data class TextDocument(
+    val name: String,
+    val extension: String,
+    val content: String
+)
+
 class DesktopCapabilities {
     fun inspectFolder(folder: Path, limit: Int = 80): List<WorkspaceEntry> {
         require(Files.isDirectory(folder)) { "Folder tidak ditemukan: $folder" }
@@ -50,12 +62,38 @@ class DesktopCapabilities {
         }
     }
 
+    fun findFiles(root: Path, query: String, limit: Int = 80): List<FileMatch> {
+        require(Files.isDirectory(root)) { "Workspace tidak ditemukan: $root" }
+        require(query.isNotBlank()) { "Query pencarian kosong." }
+        val needle = query.lowercase()
+        val matches = mutableListOf<FileMatch>()
+        Files.walk(root).use { stream ->
+            stream.filter { Files.isRegularFile(it) }
+                .filter { !it.toString().contains(java.io.File.separator + ".git" + java.io.File.separator) }
+                .forEach { file ->
+                    if (matches.size < limit && file.fileName.toString().lowercase().contains(needle)) {
+                        matches += FileMatch(
+                            root.relativize(file).toString(),
+                            runCatching { Files.size(file) }.getOrDefault(0L),
+                            file.fileName.toString().substringAfterLast('.', "")
+                        )
+                    }
+                }
+        }
+        return matches
+    }
+
     fun readTextFile(file: Path, maxChars: Int = 20000): String {
         require(Files.isRegularFile(file)) { "File tidak ditemukan: $file" }
         val allowed = setOf("txt", "md", "json", "xml", "yaml", "yml", "toml", "kt", "kts", "java", "py", "js", "ts", "tsx", "jsx", "html", "css", "sql", "csv", "gradle", "properties")
         val ext = file.fileName.toString().substringAfterLast('.', "").lowercase()
         require(ext in allowed) { "Format .$ext belum didukung untuk pembacaan teks aman." }
         return Files.readString(file).take(maxChars)
+    }
+
+    fun readDocument(file: Path, maxChars: Int = 30000): TextDocument {
+        val content = readTextFile(file, maxChars)
+        return TextDocument(file.fileName.toString(), file.fileName.toString().substringAfterLast('.', ""), content)
     }
 
     fun searchWorkspace(root: Path, query: String, limit: Int = 40): List<SearchResult> {
