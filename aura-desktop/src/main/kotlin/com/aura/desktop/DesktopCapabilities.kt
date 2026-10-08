@@ -67,6 +67,12 @@ class DesktopCapabilities {
             else clipboard.getData(DataFlavor.stringFlavor) as String
         }.getOrNull()
 
+    fun openApplication(executableOrCommand: String): Boolean =
+        runCatching {
+            ProcessBuilder(executableOrCommand.split(" ").filter { it.isNotBlank() }).start()
+            true
+        }.getOrDefault(false)
+
     fun gitStatus(repo: Path): GitWorkspaceStatus {
         require(Files.isDirectory(repo.resolve(".git"))) { "Folder ini bukan Git repository." }
         val root = command(repo.toFile(), "rev-parse", "--show-toplevel").trim()
