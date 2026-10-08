@@ -400,7 +400,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
             AuraRoutingRequest(task = task, mode = AuraRoutingMode.BALANCED, estimatedInputTokens = (command.length + latestScene.length) / 4),
             listOf(
                 "system" to "Anda adalah AURA, asisten kognitif berbahasa Indonesia yang natural, ringkas, hangat, dan tidak mengarang kemampuan. Gunakan konteks visual bila relevan.",
-                "user" to "Permintaan: $command\\nKonteks visual saat ini: $latestScene"
+                "user" to "Permintaan: $command\nKonteks visual saat ini: $latestScene"
             )
         ) { result ->
             runOnUiThread {
