@@ -71,13 +71,13 @@ class AuraGatewayPolicyBridge(
                 AuraModelRequest(
                     model = profile.modelId,
                     messages = AuraContextOptimizer().optimize(messages),
-                    maxTokens = (estimatedTokens * 2).coerceAtLeast(256)
+                    maxTokens = (messages.sumOf { it.second.length } / 4 * 2).coerceAtLeast(256)
                 )
             )
             val elapsed = (System.nanoTime() - started) / 1_000_000L
             callback(
                 AuraGatewayResult.Success(
-                    response = response.text,
+                    text = response.text,
                     decision = AuraRoutingDecision(
                         selected = AuraModelProfile(
                             providerId = profile.providerId,
@@ -93,7 +93,7 @@ class AuraGatewayPolicyBridge(
                         ),
                         candidates = emptyList(),
                         reason = policyExplanation,
-                        fallbackChain = ordered.drop(index + 1).map { it.modelId }
+                        fallbackChain = ordered.drop(index + 1).map { AuraModelProfile(providerId = it.providerId, modelId = it.modelId, quality = it.quality, latencyMs = it.health.latencyMs, costPer1kTokensUsd = it.costPer1kTokensUsd, quotaRemaining = it.health.quotaRemaining, health = it.health.health, taskFit = it.quality, supportsVision = AuraCapability.VISION in it.capabilities, supportsIndonesian = true) }
                     )
                 )
             )
