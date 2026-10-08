@@ -2,7 +2,11 @@ package com.aura.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.pm.PackageManager
+import android.text.InputType
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -30,6 +34,13 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.aura.core.AuraRuntime
+import com.aura.core.AuraGatewayConfig
+import com.aura.core.AuraGatewayResult
+import com.aura.core.AuraNeuralGateway
+import com.aura.core.AuraOmniRouteCatalog
+import com.aura.core.AuraRoutingMode
+import com.aura.core.AuraRoutingRequest
+import com.aura.core.AuraTaskType
 import com.aura.core.AffectiveState
 import com.aura.core.AuraMood
 import com.aura.core.IndonesianVoiceRuntime
@@ -50,6 +61,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
 
     private val auraRuntime = AuraRuntime()
     private val voiceRuntime = IndonesianVoiceRuntime()
+    private val gatewayPrefs by lazy { getSharedPreferences("aura_gateway", MODE_PRIVATE) }
 
     private val cameraRequestCode = 1701
     private val microphoneRequestCode = 1702
@@ -111,6 +123,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
             setPadding(dp(18f), dp(12f), dp(18f), dp(12f))
             background = roundedBackground(0xC905070A.toInt(), 18f)
             gravity = Gravity.CENTER_VERTICAL
+            setOnLongClickListener { configureGateway(); true }
         }
 
         sceneText = TextView(this).apply {
@@ -373,10 +386,80 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
     }
 
     private fun handleCommand(command: String) {
+        val gateway = currentGateway()
+        if (!gateway.configured) { respondLocally(command); return }
+        statusText.text = "AURA • Neural Gateway sedang memilih model…"
+        val task = when {
+            command.contains("kode", true) || command.contains("program", true) || command.contains("coding", true) -> AuraTaskType.CODING
+            command.contains("terjemah", true) || command.contains("translate", true) -> AuraTaskType.TRANSLATION
+            command.contains("cepat", true) -> AuraTaskType.FAST
+            command.contains("lihat", true) || command.contains("kamera", true) -> AuraTaskType.VISION
+            else -> AuraTaskType.CHAT
+        }
+        gateway.gateway.execute(
+            AuraRoutingRequest(task = task, mode = AuraRoutingMode.BALANCED, estimatedInputTokens = (command.length + latestScene.length) / 4),
+            listOf(
+                "system" to "Anda adalah AURA, asisten kognitif berbahasa Indonesia yang natural, ringkas, hangat, dan tidak mengarang kemampuan. Gunakan konteks visual bila relevan.",
+                "user" to "Permintaan: $command\nKonteks visual saat ini: $latestScene"
+            )
+        ) { result ->
+            runOnUiThread {
+                when (result) {
+                    is AuraGatewayResult.Success -> {
+                        statusText.text = "AURA • ${result.decision.selected?.providerId ?: "gateway"} / ${result.decision.selected?.modelId ?: "auto"}"
+                        sceneText.text = result.text
+                        speak(result.text, auraRuntime.currentAffectiveState())
+                    }
+                    is AuraGatewayResult.Failure -> {
+                        statusText.text = "AURA • fallback lokal"
+                        respondLocally(command)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun respondLocally(command: String) {
         val turn = auraRuntime.respond(command, latestScene)
         statusText.text = "AURA • " + turn.intent.name
         sceneText.text = turn.responseText
         speak(turn.responseText, turn.affectiveState)
+    }
+
+    private data class GatewayHandle(val configured: Boolean, val gateway: AuraNeuralGateway)
+
+    private fun currentGateway(): GatewayHandle {
+        val url = gatewayPrefs.getString("url", "").orEmpty().trim()
+        val key = gatewayPrefs.getString("key", "").orEmpty()
+        val config = AuraGatewayConfig(baseUrl = url, apiKey = key)
+        return GatewayHandle(config.enabled, AuraNeuralGateway(config, AuraOmniRouteCatalog()))
+    }
+
+    private fun configureGateway() {
+        val urlInput = EditText(this).apply {
+            hint = "http://IP-PC:20128/v1"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setText(gatewayPrefs.getString("url", "")); setSingleLine(true)
+        }
+        val keyInput = EditText(this).apply {
+            hint = "API key (opsional)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setText(gatewayPrefs.getString("key", "")); setSingleLine(true)
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24f), dp(8f), dp(24f), 0)
+            addView(urlInput); addView(keyInput)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("AURA Neural Gateway")
+            .setMessage("Hubungkan AURA ke OmniRoute atau gateway OpenAI-compatible. Tekan lama panel AURA untuk mengubahnya.")
+            .setView(layout)
+            .setNegativeButton("Hapus") { _, _ -> gatewayPrefs.edit().clear().apply(); statusText.text = "Gateway dinonaktifkan • AURA lokal aktif" }
+            .setPositiveButton("Simpan") { _, _ ->
+                gatewayPrefs.edit().putString("url", urlInput.text.toString().trim()).putString("key", keyInput.text.toString()).apply()
+                statusText.text = if (urlInput.text.isNullOrBlank()) "Gateway dinonaktifkan • AURA lokal aktif" else "Neural Gateway tersambung secara konfigurasi"
+            }.show()
     }
 
     private fun speak(text: String, affect: AffectiveState = AffectiveState()) {
