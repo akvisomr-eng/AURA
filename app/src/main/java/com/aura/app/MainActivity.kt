@@ -396,12 +396,25 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
             command.contains("lihat", true) || command.contains("kamera", true) -> AuraTaskType.VISION
             else -> AuraTaskType.CHAT
         }
-        gateway.gateway.execute(
-            AuraRoutingRequest(task = task, mode = AuraRoutingMode.BALANCED, estimatedInputTokens = (command.length + latestScene.length) / 4),
-            listOf(
-                "system" to "Anda adalah AURA, asisten kognitif berbahasa Indonesia yang natural, ringkas, hangat, dan tidak mengarang kemampuan. Gunakan konteks visual bila relevan.",
-                "user" to "Permintaan: $command\nKonteks visual saat ini: $latestScene"
-            )
+        val messages = listOf(
+            "system" to "Anda adalah AURA, asisten kognitif berbahasa Indonesia yang natural, ringkas, hangat, dan tidak mengarang kemampuan. Gunakan konteks visual bila relevan.",
+            "user" to "Permintaan: $command\nKonteks visual saat ini: $latestScene"
+        )
+        val plan = auraRuntime.cognitivePlan(command)
+        val context = plan.context
+        gateway.policy.execute(
+            task = task,
+            messages = messages,
+            context = com.aura.core.AuraContextSignals(
+                memoryRelevance = context.memoryHits.maxOfOrNull { it.relevance } ?: 0.0,
+                contextComplexity = context.complexity,
+                userPriority = 0.5,
+                devicePower = 0.5,
+                networkQuality = 0.5,
+                privacySensitive = context.privacySensitive,
+                requiredCapabilities = context.requiredCapabilities
+            ),
+            estimatedTokens = (command.length + latestScene.length) / 4
         ) { result ->
             runOnUiThread {
                 when (result) {
@@ -426,13 +439,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener, ActivityC
         speak(turn.responseText, turn.affectiveState)
     }
 
-    private data class GatewayHandle(val configured: Boolean, val gateway: AuraNeuralGateway)
+    private data class GatewayHandle(
+        val configured: Boolean,
+        val policy: com.aura.core.AuraGatewayPolicyBridge
+    )
 
     private fun currentGateway(): GatewayHandle {
         val url = gatewayPrefs.getString("url", "").orEmpty().trim()
         val key = gatewayPrefs.getString("key", "").orEmpty()
         val config = AuraGatewayConfig(baseUrl = url, apiKey = key)
-        return GatewayHandle(config.enabled, AuraNeuralGateway(config, AuraOmniRouteCatalog()))
+        val adapter = com.aura.core.AuraNineRouterAdapter(config)
+        return GatewayHandle(
+            configured = config.enabled,
+            policy = com.aura.core.AuraGatewayPolicyBridge(
+                gateways = mapOf("9router" to adapter)
+            )
+        )
     }
 
     private fun configureGateway() {
