@@ -40,4 +40,22 @@ class DesktopAgentTest {
         assertEquals(0, result.exitCode)
         assertTrue(result.output.contains("AURA"))
     }
+
+    @Test
+    fun projectBuildIntelligenceDetectsGradleWrapper() {
+        val root = Files.createTempDirectory("aura-build")
+        Files.writeString(root.resolve("gradlew"), "wrapper")
+        val build = ProjectIntelligence().recommendedBuild(root)
+        assertTrue(build.command.isNotEmpty())
+        assertTrue(build.rationale.contains("Gradle"))
+    }
+
+    @Test
+    fun fileIntelligenceFindsFilesByName() {
+        val root = Files.createTempDirectory("aura-files")
+        Files.writeString(root.resolve("architecture.md"), "AURA")
+        val matches = DesktopCapabilities().findFiles(root, "arch")
+        assertEquals(1, matches.size)
+        assertEquals("architecture.md", matches.first().path)
+    }
 }
