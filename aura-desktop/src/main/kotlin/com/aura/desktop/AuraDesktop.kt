@@ -54,7 +54,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         send.addActionListener { sendMessage() }
         input.addActionListener { sendMessage() }
 
-        val tools = JPanel(GridLayout(3, 4, 8, 8))
+        val tools = JPanel(GridLayout(4, 4, 8, 8))
         val openFile = JButton("Buka Dokumen")
         val readFile = JButton("Baca File")
         val runtimeStatus = JButton("Status")
@@ -67,6 +67,10 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val screenButton = JButton("Screen Snapshot")
         val approvalButton = JButton("Approval")
         val launchButton = JButton("Buka Aplikasi")
+        val searchButton = JButton("Cari Workspace")
+        val diffButton = JButton("Git Diff")
+        val commandButton = JButton("Jalankan Task")
+        val copyButton = JButton("Salin Ringkasan")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
         runtimeStatus.addActionListener { appendAura("Status: " + runtime.status()) }
@@ -79,9 +83,14 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         screenButton.addActionListener { captureScreen() }
         approvalButton.addActionListener { showApproval() }
         launchButton.addActionListener { launchApplication() }
+        searchButton.addActionListener { searchWorkspace() }
+        diffButton.addActionListener { showGitDiff() }
+        commandButton.addActionListener { runTaskWithApproval() }
+        copyButton.addActionListener { desktop.copyToClipboard(transcript.text); appendAura("Ringkasan percakapan disalin ke clipboard.") }
         tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus); tools.add(tray)
         tools.add(workspaceButton); tools.add(gitButton); tools.add(clipboardButton); tools.add(openWorkspace)
         tools.add(projectButton); tools.add(screenButton); tools.add(approvalButton); tools.add(launchButton)
+        tools.add(searchButton); tools.add(diffButton); tools.add(commandButton); tools.add(copyButton)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -256,6 +265,53 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
             SwingUtilities.invokeLater {
                 result.onSuccess { s -> appendAura("Git workspace: ${s.root}\nBranch: ${s.branch}\nStatus:\n${s.status}\nCommit terakhir:\n${s.recentCommits.joinToString("\n")}") }
                     .onFailure { appendAura("Git belum tersedia di workspace: ${it.message}") }
+            }
+        }
+    }
+
+    private fun searchWorkspace() {
+        val root = workspace ?: run { appendAura("Pilih workspace terlebih dahulu."); return }
+        val query = JOptionPane.showInputDialog(this, "Cari teks di workspace:", "Workspace Search", JOptionPane.PLAIN_MESSAGE) ?: return
+        if (query.isBlank()) return
+        executor.execute {
+            val result = runCatching { desktop.searchWorkspace(root, query) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { hits ->
+                    if (hits.isEmpty()) appendAura("Tidak ditemukan: $query")
+                    else appendAura("Hasil pencarian "$query":\\n" + hits.joinToString("\\n") { "${it.path}:${it.line} — ${it.preview}" })
+                }.onFailure { appendAura("Pencarian gagal: ${it.message}") }
+            }
+        }
+    }
+
+    private fun showGitDiff() {
+        val root = workspace ?: run { appendAura("Pilih workspace Git terlebih dahulu."); return }
+        executor.execute {
+            val result = runCatching { desktop.gitDiff(root) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { diff -> appendAura("Git Diff Summary:\\n$diff") }
+                    .onFailure { appendAura("Git diff gagal: ${it.message}") }
+            }
+        }
+    }
+
+    private fun runTaskWithApproval() {
+        val root = workspace ?: run { appendAura("Pilih workspace terlebih dahulu."); return }
+        val command = JOptionPane.showInputDialog(this, "Task yang akan dijalankan (contoh: gradle test):", "Jalankan Task", JOptionPane.PLAIN_MESSAGE) ?: return
+        if (command.isBlank()) return
+        val request = approvals.classify("jalankan $command")
+        if (request.risk != ApprovalRisk.READ_ONLY) {
+            val approved = JOptionPane.showConfirmDialog(this, "AURA meminta izin menjalankan task:\\n$command", "Persetujuan Eksekusi", JOptionPane.YES_NO_OPTION)
+            if (approved != JOptionPane.YES_OPTION) { appendAura("Task dibatalkan."); return }
+        }
+        val args = Regex("""[^\\s"']+|"[^"]*"|'[^']*'""").findAll(command).map { it.value.trim('"', '\\'') }.toList()
+        if (args.isEmpty()) return
+        status.text = "Menjalankan task..."
+        executor.execute {
+            val result = runCatching { desktop.runApprovedCommand(root, *args.toTypedArray()) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { r -> appendAura("Task selesai (exit ${r.exitCode}):\\n${r.output}"); status.text = "AURA siap." }
+                    .onFailure { appendAura("Task gagal dijalankan: ${it.message}"); status.text = "AURA siap." }
             }
         }
     }
