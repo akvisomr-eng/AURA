@@ -32,6 +32,9 @@ jobs:
       - name: Test AURA Core
         shell: pwsh
         run: gradle :aura-core:test --no-daemon
+      - name: Test Desktop module
+        shell: pwsh
+        run: gradle :aura-desktop:test --no-daemon
       - name: Build Windows distribution
         shell: pwsh
         run: gradle :aura-desktop:installDist --no-daemon
