@@ -22,6 +22,17 @@ data class GitWorkspaceStatus(
     val recentCommits: List<String>
 )
 
+data class SearchResult(
+    val path: String,
+    val line: Int,
+    val preview: String
+)
+
+data class CommandResult(
+    val exitCode: Int,
+    val output: String
+)
+
 class DesktopCapabilities {
     fun inspectFolder(folder: Path, limit: Int = 80): List<WorkspaceEntry> {
         require(Files.isDirectory(folder)) { "Folder tidak ditemukan: $folder" }
@@ -47,6 +58,29 @@ class DesktopCapabilities {
         return Files.readString(file).take(maxChars)
     }
 
+    fun searchWorkspace(root: Path, query: String, limit: Int = 40): List<SearchResult> {
+        require(Files.isDirectory(root)) { "Workspace tidak ditemukan: $root" }
+        require(query.isNotBlank()) { "Query pencarian kosong." }
+        val needle = query.lowercase()
+        val results = mutableListOf<SearchResult>()
+        Files.walk(root).use { stream ->
+            stream.filter { Files.isRegularFile(it) }
+                .filter { !it.toString().contains(${java.io.File.separator} + ".git" + ${java.io.File.separator}) }
+                .filter { it.fileName.toString().substringAfterLast('.', "").lowercase() in
+                    setOf("txt","md","json","xml","yaml","yml","toml","kt","kts","java","py","js","ts","tsx","jsx","html","css","sql","csv","gradle","properties") }
+                .forEach { file ->
+                    if (results.size < limit) runCatching {
+                        Files.readAllLines(file).forEachIndexed { index, line ->
+                            if (results.size < limit && line.lowercase().contains(needle)) {
+                                results += SearchResult(root.relativize(file).toString(), index + 1, line.trim().take(240))
+                            }
+                        }
+                    }
+                }
+        }
+        return results
+    }
+
     fun openPath(path: Path): Boolean =
         runCatching {
             if (!Desktop.isDesktopSupported()) return false
@@ -69,9 +103,27 @@ class DesktopCapabilities {
 
     fun openApplication(executableOrCommand: String): Boolean =
         runCatching {
-            ProcessBuilder(executableOrCommand.split(" ").filter { it.isNotBlank() }).start()
+            val parts = parseCommandLine(executableOrCommand)
+            require(parts.isNotEmpty()) { "Perintah kosong." }
+            ProcessBuilder(parts).start()
             true
         }.getOrDefault(false)
+
+    fun gitDiff(repo: Path): String {
+        require(Files.isDirectory(repo.resolve(".git"))) { "Folder ini bukan Git repository." }
+        return command(repo.toFile(), "diff", "--stat", "--", ".").trim().ifBlank { "Tidak ada perubahan tracked." }
+    }
+
+    fun runApprovedCommand(directory: Path, vararg args: String): CommandResult {
+        require(args.isNotEmpty()) { "Perintah kosong." }
+        require(Files.isDirectory(directory)) { "Working directory tidak ditemukan." }
+        val process = ProcessBuilder(args.toList())
+            .directory(directory.toFile())
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText().take(30000)
+        return CommandResult(process.waitFor(), output)
+    }
 
     fun gitStatus(repo: Path): GitWorkspaceStatus {
         require(Files.isDirectory(repo.resolve(".git"))) { "Folder ini bukan Git repository." }
@@ -81,6 +133,9 @@ class DesktopCapabilities {
         val commits = command(repo.toFile(), "log", "-5", "--pretty=format:%h %s").lines().filter { it.isNotBlank() }
         return GitWorkspaceStatus(root, branch, status, commits)
     }
+
+    private fun parseCommandLine(command: String): List<String> =
+        Regex("""[^\s"']+|"[^"]*"|'[^']*'""").findAll(command).map { it.value.trim('"', '\'') }.toList()
 
     private fun command(directory: File, vararg args: String): String {
         val process = ProcessBuilder(listOf("git") + args)
