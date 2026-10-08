@@ -1,6 +1,7 @@
 name: AURA Windows
 
 # Desktop packaging workflow
+# Produces both the portable ZIP and a native Windows .exe installer.
 
 on:
   workflow_dispatch:
@@ -20,33 +21,112 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+
       - name: Test AURA Core
         shell: pwsh
         run: gradle :aura-core:test --no-daemon
+
       - name: Test Desktop module
         shell: pwsh
         run: gradle :aura-desktop:test --no-daemon
+
       - name: Build Windows distribution
         shell: pwsh
         run: gradle :aura-desktop:installDist --no-daemon
-      - name: Package Windows app image
+
+      - name: Verify Java packaging toolchain
         shell: pwsh
-        run: jpackage --type app-image --name AURA --app-version 2.0.0 --input aura-desktop/build/install/aura-desktop/lib --main-jar aura-desktop.jar --main-class com.aura.desktop.AuraDesktopKt --dest aura-desktop/build/jpackage
-      - name: Zip Windows app
+        run: |
+          java -version
+          jpackage --version
+
+      - name: Install WiX Toolset for native EXE installer
         shell: pwsh
-        run: Compress-Archive -Path aura-desktop/build/jpackage/AURA -DestinationPath aura-desktop/build/AURA-Windows.zip
-      - name: Upload Windows package
+        run: |
+          choco install wixtoolset --no-progress -y
+          $wix = Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset*" -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if ($null -eq $wix) {
+            throw "WiX Toolset installation directory was not found."
+          }
+          $wixBin = Join-Path $wix.FullName "bin"
+          $env:Path = "$wixBin;$env:Path"
+          "WIX_BIN=$wixBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+          & (Join-Path $wixBin "candle.exe") -?
+          & (Join-Path $wixBin "light.exe") -?
+
+      - name: Package Windows portable app image
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "aura-desktop/build/jpackage" | Out-Null
+          jpackage `
+            --type app-image `
+            --name AURA `
+            --app-version 2.0.0 `
+            --input "aura-desktop/build/install/aura-desktop/lib" `
+            --main-jar aura-desktop.jar `
+            --main-class com.aura.desktop.AuraDesktopKt `
+            --dest "aura-desktop/build/jpackage"
+
+      - name: Package native Windows EXE installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "aura-desktop/build/installer" | Out-Null
+          jpackage `
+            --type exe `
+            --name AURA `
+            --app-version 2.0.0 `
+            --vendor "AURA" `
+            --description "AURA Work Companion for Windows" `
+            --input "aura-desktop/build/install/aura-desktop/lib" `
+            --main-jar aura-desktop.jar `
+            --main-class com.aura.desktop.AuraDesktopKt `
+            --dest "aura-desktop/build/installer" `
+            --win-dir-chooser `
+            --win-menu `
+            --win-menu-group "AURA" `
+            --win-shortcut `
+            --win-per-user-install
+
+      - name: Verify native installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "aura-desktop/build/installer" -Filter "*.exe" -File
+          if ($installer.Count -ne 1) {
+            throw "Expected exactly one EXE installer, found $($installer.Count)."
+          }
+          Write-Host "Installer: $($installer.FullName)"
+          Write-Host "Size: $([math]::Round($installer.Length / 1MB, 2)) MB"
+
+      - name: Zip Windows portable app
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "aura-desktop/build/jpackage/AURA" `
+            -DestinationPath "aura-desktop/build/AURA-Windows-2.0.0-portable.zip"
+
+      - name: Upload Windows portable package
         uses: actions/upload-artifact@v4
         with:
-          name: aura-windows
-          path: aura-desktop/build/AURA-Windows.zip
+          name: aura-windows-portable
+          path: aura-desktop/build/AURA-Windows-2.0.0-portable.zip
+          if-no-files-found: error
+
+      - name: Upload native Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-windows-installer
+          path: aura-desktop/build/installer/*.exe
           if-no-files-found: error
