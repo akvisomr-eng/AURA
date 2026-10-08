@@ -17,6 +17,7 @@ import java.awt.TrayIcon
 import java.awt.PopupMenu
 import java.awt.MenuItem
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.Executors
 import javax.swing.*
 
@@ -30,6 +31,8 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private val status = JLabel("AURA siap membantu pekerjaan Anda.")
     private val gatewayUrl = JTextField(System.getenv("AURA_GATEWAY_URL") ?: "")
     private val gatewayKey = JTextField(System.getenv("AURA_GATEWAY_KEY") ?: "")
+    private val desktop = DesktopCapabilities()
+    private var workspace: Path? = null
 
     init {
         defaultCloseOperation = DO_NOTHING_ON_CLOSE
@@ -48,16 +51,25 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         send.addActionListener { sendMessage() }
         input.addActionListener { sendMessage() }
 
-        val tools = JPanel(GridLayout(1, 3, 8, 8))
+        val tools = JPanel(GridLayout(2, 4, 8, 8))
         val openFile = JButton("Buka Dokumen")
         val readFile = JButton("Baca File")
         val runtimeStatus = JButton("Status")
         val tray = JButton("Ke Tray")
+        val workspaceButton = JButton("Workspace")
+        val gitButton = JButton("Git Status")
+        val clipboardButton = JButton("Clipboard")
+        val openWorkspace = JButton("Buka Workspace")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
         runtimeStatus.addActionListener { appendAura("Status: " + runtime.status()) }
         tray.addActionListener { minimizeToTray() }
+        workspaceButton.addActionListener { chooseWorkspace() }
+        gitButton.addActionListener { showGitStatus() }
+        clipboardButton.addActionListener { showClipboard() }
+        openWorkspace.addActionListener { workspace?.let { desktop.openPath(it) } ?: appendAura("Pilih workspace terlebih dahulu.") }
         tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus); tools.add(tray)
+        tools.add(workspaceButton); tools.add(gitButton); tools.add(clipboardButton); tools.add(openWorkspace)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -176,6 +188,33 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
                 }
             }
         }
+    }
+
+    private fun chooseWorkspace() {
+        val chooser = JFileChooser()
+        chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return
+        workspace = chooser.selectedFile.toPath()
+        val entries = runCatching { desktop.inspectFolder(workspace!!) }.getOrNull()
+        if (entries == null) appendAura("Workspace tidak dapat dibaca.")
+        else appendAura("Workspace aktif: ${workspace}\n${entries.joinToString("\n") { (if (it.directory) "[DIR] " else "[FILE] ") + it.name }}")
+    }
+
+    private fun showGitStatus() {
+        val root = workspace ?: run { appendAura("Pilih workspace Git terlebih dahulu."); return }
+        executor.execute {
+            val result = runCatching { desktop.gitStatus(root) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { s -> appendAura("Git workspace: ${s.root}\nBranch: ${s.branch}\nStatus:\n${s.status}\nCommit terakhir:\n${s.recentCommits.joinToString("\n")}") }
+                    .onFailure { appendAura("Git belum tersedia di workspace: ${it.message}") }
+            }
+        }
+    }
+
+    private fun showClipboard() {
+        val text = desktop.readClipboard()
+        if (text.isNullOrBlank()) appendAura("Clipboard kosong atau bukan teks.")
+        else appendAura("Clipboard:\n${text.take(8000)}")
     }
 
     private fun chooseFile(readContent: Boolean) {
