@@ -47,4 +47,17 @@ class ProjectIntelligence {
         }
         return ProjectProfile(root.toAbsolutePath().toString(), kind, source, tests, buildFiles.distinct(), keyDirectories)
     }
+
+    fun recommendedBuild(root: Path): BuildProfile {
+        require(Files.isDirectory(root)) { "Folder project tidak ditemukan." }
+        val files = Files.list(root).use { stream -> stream.map { it.fileName.toString().lowercase() }.toList() }
+        return when {
+            files.contains("gradlew.bat") -> BuildProfile(listOf("gradlew.bat", "test"), "Gradle wrapper Windows terdeteksi.")
+            files.contains("gradlew") -> BuildProfile(listOf("gradlew", "test"), "Gradle wrapper terdeteksi.")
+            files.contains("package.json") -> BuildProfile(listOf("npm", "test"), "package.json terdeteksi.")
+            files.contains("pyproject.toml") -> BuildProfile(listOf("python", "-m", "pytest"), "pyproject.toml terdeteksi.")
+            files.contains("cargo.toml") -> BuildProfile(listOf("cargo", "test"), "Cargo project terdeteksi.")
+            else -> BuildProfile(emptyList(), "Tidak ada build/test command standar yang dapat ditentukan.")
+        }
+    }
 }
