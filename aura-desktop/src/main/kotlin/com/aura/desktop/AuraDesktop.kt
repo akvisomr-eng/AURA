@@ -278,7 +278,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
             SwingUtilities.invokeLater {
                 result.onSuccess { hits ->
                     if (hits.isEmpty()) appendAura("Tidak ditemukan: $query")
-                    else appendAura("Hasil pencarian "$query":\\n" + hits.joinToString("\\n") { "${it.path}:${it.line} — ${it.preview}" })
+                    else appendAura("Hasil pencarian \\$query:\\n" + hits.joinToString("\\n") { "${it.path}:${it.line} — ${it.preview}" })
                 }.onFailure { appendAura("Pencarian gagal: ${it.message}") }
             }
         }
