@@ -32,6 +32,9 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private val gatewayUrl = JTextField(System.getenv("AURA_GATEWAY_URL") ?: "")
     private val gatewayKey = JTextField(System.getenv("AURA_GATEWAY_KEY") ?: "")
     private val desktop = DesktopCapabilities()
+    private val screen = ScreenIntelligence()
+    private val project = ProjectIntelligence()
+    private val approvals = ApprovalEngine()
     private var workspace: Path? = null
 
     init {
@@ -51,7 +54,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         send.addActionListener { sendMessage() }
         input.addActionListener { sendMessage() }
 
-        val tools = JPanel(GridLayout(2, 4, 8, 8))
+        val tools = JPanel(GridLayout(3, 4, 8, 8))
         val openFile = JButton("Buka Dokumen")
         val readFile = JButton("Baca File")
         val runtimeStatus = JButton("Status")
@@ -60,6 +63,10 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val gitButton = JButton("Git Status")
         val clipboardButton = JButton("Clipboard")
         val openWorkspace = JButton("Buka Workspace")
+        val projectButton = JButton("Analisis Project")
+        val screenButton = JButton("Screen Snapshot")
+        val approvalButton = JButton("Approval")
+        val launchButton = JButton("Buka Aplikasi")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
         runtimeStatus.addActionListener { appendAura("Status: " + runtime.status()) }
@@ -68,8 +75,13 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         gitButton.addActionListener { showGitStatus() }
         clipboardButton.addActionListener { showClipboard() }
         openWorkspace.addActionListener { workspace?.let { desktop.openPath(it) } ?: appendAura("Pilih workspace terlebih dahulu.") }
+        projectButton.addActionListener { analyzeProject() }
+        screenButton.addActionListener { captureScreen() }
+        approvalButton.addActionListener { showApproval() }
+        launchButton.addActionListener { launchApplication() }
         tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus); tools.add(tray)
         tools.add(workspaceButton); tools.add(gitButton); tools.add(clipboardButton); tools.add(openWorkspace)
+        tools.add(projectButton); tools.add(screenButton); tools.add(approvalButton); tools.add(launchButton)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -188,6 +200,43 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
                 }
             }
         }
+    }
+
+    private fun analyzeProject() {
+        val root = workspace ?: run { appendAura("Pilih workspace terlebih dahulu."); return }
+        executor.execute {
+            val result = runCatching { project.profile(root) }
+            SwingUtilities.invokeLater {
+                result.onSuccess { p -> appendAura("Project Intelligence:\nJenis: ${p.kind}\nSource files: ${p.sourceFiles}\nTest files: ${p.testFiles}\nBuild: ${p.buildFiles.joinToString(", ").ifBlank { "tidak terdeteksi" }}") }
+                    .onFailure { appendAura("Analisis project gagal: ${it.message}") }
+            }
+        }
+    }
+
+    private fun captureScreen() {
+        executor.execute {
+            val result = runCatching { screen.capturePrimary() }
+            SwingUtilities.invokeLater {
+                result.onSuccess { s -> appendAura("Screen Intelligence aktif: ${s.width}x${s.height}, ${s.monitorCount} monitor. Snapshot berhasil diambil untuk tahap computer vision berikutnya.") }
+                    .onFailure { appendAura("Screen capture tidak tersedia: ${it.message}") }
+            }
+        }
+    }
+
+    private fun showApproval() {
+        val request = approvals.classify("jalankan tindakan dari AURA")
+        appendAura("Approval Engine: ${request.risk}\n${request.description}")
+    }
+
+    private fun launchApplication() {
+        val command = JOptionPane.showInputDialog(this, "Nama executable/perintah aplikasi:", "Buka Aplikasi", JOptionPane.PLAIN_MESSAGE) ?: return
+        if (command.isBlank()) return
+        val request = approvals.classify("jalankan $command")
+        if (request.risk != ApprovalRisk.READ_ONLY) {
+            val approved = JOptionPane.showConfirmDialog(this, "AURA meminta izin menjalankan: $command", "Persetujuan", JOptionPane.YES_NO_OPTION)
+            if (approved != JOptionPane.YES_OPTION) { appendAura("Tindakan dibatalkan."); return }
+        }
+        appendAura(if (desktop.openApplication(command)) "Aplikasi dijalankan: $command" else "Gagal menjalankan: $command")
     }
 
     private fun chooseWorkspace() {
