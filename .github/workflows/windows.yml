@@ -40,7 +40,7 @@ jobs:
         run: gradle :aura-desktop:installDist --no-daemon
       - name: Package Windows app image
         shell: pwsh
-        run: jpackage --type app-image --name AURA --input aura-desktop/build/install/aura-desktop/lib --main-jar aura-desktop.jar --main-class com.aura.desktop.AuraDesktopKt --dest aura-desktop/build/jpackage
+        run: jpackage --type app-image --name AURA --app-version 2.0.0 --input aura-desktop/build/install/aura-desktop/lib --main-jar aura-desktop.jar --main-class com.aura.desktop.AuraDesktopKt --dest aura-desktop/build/jpackage
       - name: Zip Windows app
         shell: pwsh
         run: Compress-Archive -Path aura-desktop/build/jpackage/AURA -DestinationPath aura-desktop/build/AURA-Windows.zip
