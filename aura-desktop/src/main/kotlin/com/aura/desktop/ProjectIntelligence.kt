@@ -8,7 +8,13 @@ data class ProjectProfile(
     val kind: String,
     val sourceFiles: Int,
     val testFiles: Int,
-    val buildFiles: List<String>
+    val buildFiles: List<String>,
+    val keyDirectories: List<String> = emptyList()
+)
+
+data class BuildProfile(
+    val command: List<String>,
+    val rationale: String
 )
 
 class ProjectIntelligence {
@@ -35,6 +41,10 @@ class ProjectIntelligence {
             buildFiles.any { it == "Cargo.toml" } -> "Rust"
             else -> "Project umum"
         }
-        return ProjectProfile(root.toAbsolutePath().toString(), kind, source, tests, buildFiles.distinct())
+        val keyDirectories = Files.list(root).use { stream ->
+            stream.filter { Files.isDirectory(it) && !it.fileName.toString().startsWith(".") }
+                .map { it.fileName.toString() }.sorted().limit(20).toList()
+        }
+        return ProjectProfile(root.toAbsolutePath().toString(), kind, source, tests, buildFiles.distinct(), keyDirectories)
     }
 }
