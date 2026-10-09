@@ -190,7 +190,8 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         exit.addActionListener {
             keepReady = false
             trayIcon?.let { SystemTray.getSystemTray().remove(it) }
-            speechListener.stop()\n            executor.shutdownNow()
+            speechListener.stop()
+            executor.shutdownNow()
             dispose()
             System.exit(0)
         }
