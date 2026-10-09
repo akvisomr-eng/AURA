@@ -597,16 +597,16 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
                 val safeText = text.replace("'", "''").replace("`", " ").replace("\r", " ").replace("\n", " ").take(1200)
                 val script = """
                     Add-Type -AssemblyName System.Speech
-                    ${'v = New-Object System.Speech.Synthesis.SpeechSynthesizer
+                    ${'$'}v = New-Object System.Speech.Synthesis.SpeechSynthesizer
                     try {
-                      \$voice = \$v.GetInstalledVoices() | Where-Object { \$_.Enabled -and \$_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
-                      if (\$null -eq \$voice) {
+                      ${'$'}voice = ${'$'}v.GetInstalledVoices() | Where-Object { ${'$'}_.Enabled -and ${'$'}_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (${ '$' }null -eq ${'$'}voice) {
                         [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
                         exit 23
                       }
-                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
-                      \$v.Speak('$safeText')
-                    } finally { \$v.Dispose() }
+                      ${'$'}v.SelectVoice(${ '$' }voice.VoiceInfo.Name)
+                      ${'$'}v.Speak('${'$'}safeText')
+                    } finally { ${'$'}v.Dispose() }
                 """.trimIndent()
                 runCatching {
                     val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
