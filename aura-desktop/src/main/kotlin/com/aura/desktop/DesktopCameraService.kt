@@ -33,8 +33,10 @@ class DesktopCameraService(
         .toList()
 ) {
     private val provider = providers.firstOrNull { it.isSupported() }
-    private val manager: AuraCameraManager? = provider?.let {
-        AuraCameraManager(it.createAdapter(), it.createPermissionGate())
+    // Defer native adapter creation until the user requests a scan or camera state.
+    // This keeps application startup independent of native camera libraries.
+    private val manager: AuraCameraManager? by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        provider?.let { AuraCameraManager(it.createAdapter(), it.createPermissionGate()) }
     }
 
     fun availability(): DesktopCameraAvailability =
