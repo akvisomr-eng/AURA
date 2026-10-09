@@ -49,8 +49,10 @@ class DesktopCameraServiceTest {
     fun serviceLoaderDoesNotEnumerateOrOpenHardwareDuringConstruction() {
         val service = DesktopCameraService()
 
-        val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-        assertEquals(isWindows, service.availability().available)
+        val os = System.getProperty("os.name").lowercase()
+        val supportedDesktop = os.startsWith("windows") || os.contains("linux") || os.startsWith("mac")
+        assertEquals(supportedDesktop, service.availability().available)
+        assertNull(service.state())
     }
 
     @Test
