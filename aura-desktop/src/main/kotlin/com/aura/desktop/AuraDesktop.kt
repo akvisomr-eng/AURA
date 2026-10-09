@@ -597,7 +597,7 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
                 val safeText = text.replace("'", "''").replace("`", " ").replace("\r", " ").replace("\n", " ").take(1200)
                 val script = """
                     Add-Type -AssemblyName System.Speech
-                    \$v = New-Object System.Speech.Synthesis.SpeechSynthesizer
+                    ${'v = New-Object System.Speech.Synthesis.SpeechSynthesizer
                     try {
                       \$voice = \$v.GetInstalledVoices() | Where-Object { \$_.Enabled -and \$_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
                       if (\$null -eq \$voice) {
@@ -607,6 +607,280 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
                       \$v.SelectVoice(\$voice.VoiceInfo.Name)
                       \$v.Speak('$safeText')
                     } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}v = New-Object System.Speech.Synthesis.SpeechSynthesizer
+                    try {
+                      ${'voice = \$v.GetInstalledVoices() | Where-Object { \$_.Enabled -and \$_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (\$null -eq \$voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}voice = ${'v.GetInstalledVoices() | Where-Object { \$_.Enabled -and \$_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (\$null -eq \$voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}v.GetInstalledVoices() | Where-Object { ${'_.Enabled -and \$_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (\$null -eq \$voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}_.Enabled -and ${'_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (\$null -eq \$voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (${'null -eq \$voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}null -eq ${'voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      ${'v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}v.SelectVoice(${'voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}voice.VoiceInfo.Name)
+                      ${'v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}v.Speak('$safeText')
+                    } finally { ${'v.Dispose() }
+                """.trimIndent()
+                runCatching {
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+}v.Dispose() }
                 """.trimIndent()
                 runCatching {
                     val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
