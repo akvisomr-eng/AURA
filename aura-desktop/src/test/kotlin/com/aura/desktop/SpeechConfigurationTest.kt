@@ -12,6 +12,11 @@ class SpeechConfigurationTest {
     }
 
     @Test
+    fun microphoneCaptureFallsBackToCommonWindowsSampleRates() {
+        assertEquals(listOf(16_000f, 44_100f, 48_000f, 22_050f), ContinuousSpeechListener.CAPTURE_SAMPLE_RATES)
+    }
+
+    @Test
     fun sessionKeyCanBeSetAndClearedWithoutPersistence() {
         SpeechCredentialStore.clearSessionKey()
         SpeechCredentialStore.setSessionKey("  test-session-key  ")
