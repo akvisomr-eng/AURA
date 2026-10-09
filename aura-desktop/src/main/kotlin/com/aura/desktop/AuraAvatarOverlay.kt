@@ -16,7 +16,7 @@ class AuraAvatarOverlay(private val onAvatarClicked: () -> Unit) {
     private val message = JLabel("Halo, saya AURA. Saya siap membantu Anda.")
     private val avatar = SunAvatar()
     private var dragOrigin: Point? = null
-    private val hideTimer = Timer(9000) { message.parent?.parent?.isVisible = false }
+    private val hideTimer = Timer(9000) { window.isVisible = false }
 
     init {
         window.background = Color(0, 0, 0, 0)
@@ -67,7 +67,7 @@ class AuraAvatarOverlay(private val onAvatarClicked: () -> Unit) {
     fun showSpeech(text: String, speaking: Boolean = true) {
         SwingUtilities.invokeLater {
             message.text = "<html><div style='width:245px'>${escapeHtml(text.take(180))}</div></html>"
-            message.parent?.parent?.isVisible = true
+            window.isVisible = true
             avatar.setSpeaking(speaking)
             hideTimer.restart()
         }
