@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "AURA Browser Guardian",
+  "version": "0.1.0",
+  "description": "Pemantauan risiko situs secara lokal oleh AURA. Bukan pengganti antivirus atau layanan reputasi URL.",
+  "permissions": ["tabs", "storage", "notifications"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "AURA Browser Guardian",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}
