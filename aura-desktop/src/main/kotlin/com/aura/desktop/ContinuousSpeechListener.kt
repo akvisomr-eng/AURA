@@ -141,8 +141,8 @@ class ContinuousSpeechListener(
 
     private fun routeRecognizedText(text: String) {
         val now = System.currentTimeMillis()
-        val normalized = text.trim().replace(Regex("""^[,.:;!?\\s]+"""), "")
-        val wakeMatch = Regex("""(?i)^aura\\b[,.!?;:]?\\s*""").find(normalized)
+        val normalized = text.trim().replace(Regex("""^[,.:;!?\s]+"""), "")
+        val wakeMatch = Regex("""(?i)^aura\b[,.!?;:]?\s*""").find(normalized)
         if (wakeMatch != null) {
             conversationUntilMs = now + CONVERSATION_WINDOW_MS
             val command = normalized.substring(wakeMatch.range.last + 1).trim()
