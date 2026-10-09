@@ -8,7 +8,9 @@ Versi ini mencoba masuk ke mode siaga suara saat AURA dimulai. Ucapkan **“AURA
 
 ## Menyiapkan API key
 
-AURA tidak menyertakan API key di paket portable. Untuk memakai transkripsi dan fallback suara cloud, atur variabel lingkungan pengguna Windows bernama `AURA_SPEECH_API_KEY` menggunakan API key Anda sendiri. Tutup lalu buka kembali AURA setelah mengaturnya.
+AURA tidak menyertakan API key di paket portable. Cara termudah: buka AURA lalu klik **Atur Suara**, masukkan API key Anda, dan biarkan AURA mengaktifkan siaga suara. Kunci yang dimasukkan melalui dialog hanya disimpan di memori dan hilang saat AURA ditutup; jangan membagikan kunci Anda.
+
+Jika memilih konfigurasi Windows, Anda juga dapat mengatur variabel lingkungan pengguna bernama `AURA_SPEECH_API_KEY` sebelum membuka AURA.
 
 PowerShell (mengatur variabel untuk sesi terminal saat ini saja):
 
