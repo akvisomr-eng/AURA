@@ -88,6 +88,25 @@ jobs:
             --main-class com.aura.desktop.AuraDesktopKt `
             --dest "aura-desktop/build/jpackage"
 
+      - name: Smoke-test packaged portable application
+        shell: pwsh
+        run: |
+          $app = Join-Path (Resolve-Path "aura-desktop/build/jpackage/AURA").Path "AURA.exe"
+          if (-not (Test-Path $app)) {
+            throw "Portable launcher was not produced: $app"
+          }
+          $process = Start-Process -FilePath $app -PassThru
+          try {
+            Start-Sleep -Seconds 10
+            $stillRunning = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
+            if ($null -eq $stillRunning) {
+              throw "Portable AURA exited during startup smoke test."
+            }
+            Write-Host "Portable launcher remained running for 10 seconds."
+          } finally {
+            & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+          }
+
       - name: Package native Windows EXE installer
         shell: pwsh
         run: |
