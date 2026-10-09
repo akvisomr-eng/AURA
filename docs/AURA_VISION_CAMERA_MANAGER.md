@@ -1,29 +1,28 @@
-# AURA Vision Camera Manager vertical slice
+# AURA Vision Camera Manager
 
-This slice adds a platform-neutral lifecycle coordinator to `aura-core`. It is intentionally independent of camera SDKs so Windows and Android adapters can implement the existing `AuraCameraAdapter` contract without duplicating lifecycle policy.
+The shared `AuraCameraManager` in `aura-core` coordinates camera lifecycle without coupling core policy to a platform SDK.
 
-## Included behavior
+## Shared lifecycle behavior
+- Passive device discovery; scanning never opens a camera.
+- Explicit user action is required to start capture.
+- Permission gate runs before the adapter opens the device.
+- Format validation is applied when the adapter advertises supported formats.
+- The manager keeps a visible-capture-indicator requirement in session state.
+- Pause closes the capture handle; resuming requires another explicit start.
+- Disconnect and capture errors transition to explicit states.
 
-- Passive discovery; scanning never opens a camera.
-- Explicit user action required to start capture.
-- Permission gate runs before opening the adapter.
-- Optional format validation against discovered device capabilities.
-- Visible capture indicator remains required in state.
-- Pause closes the capture handle; resuming requires an explicit start.
-- Device unplug and frame-capture errors transition to explicit states.
-- Fake-adapter tests cover discovery, consent, permissions, format rejection, pause, unplug, and capture failure.
+## Implemented platform path
+The Windows desktop application now registers `WindowsWebcamCaptureProvider` using Webcam Capture's native driver. The desktop UI provides camera scan, explicit device selection, start/stop controls, and a live preview window. The adapter reports frame data through the shared `AuraVisionFrame` contract.
 
-## Current boundary
-
-This is a tested orchestration layer, not a hardware adapter. The repository still needs native implementations: Windows Media Foundation or a supported camera library, and Android CameraX/Camera2 plus USB-host handling where available. Real webcam enumeration, live preview rendering, hot-plug event subscriptions, and end-to-end hardware tests are not provided by this slice.
+## Boundaries
+- CI can validate compilation, automated lifecycle tests, and Windows packaging, but it cannot prove compatibility with a particular physical webcam.
+- Windows transport type is reported as unknown where the native library cannot reliably distinguish USB UVC from built-in cameras.
+- Requested frame rate is not guaranteed because the library does not expose a reliable supported-FPS list.
+- Android CameraX/Camera2 and USB-host support are not implemented by the Windows provider and require a separate Android adapter.
 
 ## Validation
-
 Run:
-
-```sh
+```sh 
 gradle :aura-core:test --no-daemon
 gradle :aura-desktop:test --no-daemon
 ```
-
-The GitHub Actions Windows workflow also tests the core and desktop modules before packaging.
