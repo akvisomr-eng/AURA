@@ -49,6 +49,17 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
     private val workspaceState = WorkspaceState()
     private val avatarOverlay = AuraAvatarOverlay { SwingUtilities.invokeLater { restoreFromTray() } }
     private var workspace: Path? = null
+    private val speechListener = ContinuousSpeechListener(
+        apiKeyProvider = { System.getenv("AURA_SPEECH_API_KEY") },
+        onText = { recognized ->
+            SwingUtilities.invokeLater {
+                input.text = recognized
+                status.text = "Ucapan dikenali; meneruskan ke AURA..."
+                sendMessage()
+            }
+        },
+        onStatus = { message -> SwingUtilities.invokeLater { status.text = message } }
+    )
 
     init {
         defaultCloseOperation = DO_NOTHING_ON_CLOSE
@@ -78,6 +89,11 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         val openWorkspace = JButton("Buka Workspace")
         val projectButton = JButton("Analisis Project")
         val screenButton = JButton("Tangkapan Layar")
+        val listenButton = JButton("Mulai Dengarkan")
+        val stopListenButton = JButton("Hentikan Dengarkan")
+        listenButton.toolTipText = "Aktifkan mikrofon; segmen ucapan dikirim ke cloud jika AURA_SPEECH_API_KEY tersedia."
+        listenButton.addActionListener { speechListener.start() }
+        stopListenButton.addActionListener { speechListener.stop() }
         val approvalButton = JButton("Approval")
         val launchButton = JButton("Buka Aplikasi")
         val searchButton = JButton("Cari Workspace")
@@ -124,6 +140,7 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         tools.add(searchButton); tools.add(diffButton); tools.add(commandButton); tools.add(copyButton)
         tools.add(fileSearchButton); tools.add(readDocButton); tools.add(buildButton); tools.add(structureButton)
         tools.add(scanCameraButton); tools.add(startCameraButton); tools.add(stopCameraButton)
+        tools.add(listenButton); tools.add(stopListenButton)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -173,7 +190,7 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         exit.addActionListener {
             keepReady = false
             trayIcon?.let { SystemTray.getSystemTray().remove(it) }
-            executor.shutdownNow()
+            speechListener.stop()\n            executor.shutdownNow()
             dispose()
             System.exit(0)
         }
