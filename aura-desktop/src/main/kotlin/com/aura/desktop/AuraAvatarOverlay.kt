@@ -18,7 +18,7 @@ class AuraAvatarOverlay(private val onAvatarClicked: () -> Unit) {
     private val message = JLabel("Halo, saya AURA. Saya siap membantu Anda.")
     private val avatar = SunAvatar()
     private var dragOrigin: Point? = null
-    private val hideTimer = Timer(9000) { window.isVisible = false }
+    private val hideTimer = Timer(9000) { avatar.setSpeaking(false); window.isVisible = false }
 
     init {
         window.background = Color(0, 0, 0, 0)
@@ -42,7 +42,7 @@ class AuraAvatarOverlay(private val onAvatarClicked: () -> Unit) {
         close.foreground = Color(240, 200, 120)
         close.background = Color(13, 24, 39)
         close.isBorderPainted = false
-        close.addActionListener { window.isVisible = false }
+        close.addActionListener { hideTimer.stop(); avatar.setSpeaking(false); window.isVisible = false }
         bubble.add(close, BorderLayout.EAST)
         window.add(bubble, BorderLayout.SOUTH)
 
@@ -77,7 +77,10 @@ class AuraAvatarOverlay(private val onAvatarClicked: () -> Unit) {
     }
 
     fun show() { SwingUtilities.invokeLater { window.isVisible = true } }
-    fun hide() { SwingUtilities.invokeLater { window.isVisible = false } }
+    fun hide() { SwingUtilities.invokeLater { hideTimer.stop(); avatar.setSpeaking(false); window.isVisible = false } }
+
+    /** Call when the actual speech engine reports playback completion. */
+    fun finishSpeaking() { SwingUtilities.invokeLater { avatar.setSpeaking(false) } }
 
     private fun escapeHtml(value: String): String = value
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
