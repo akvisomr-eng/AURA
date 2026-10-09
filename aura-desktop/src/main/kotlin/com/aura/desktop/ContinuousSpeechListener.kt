@@ -48,6 +48,18 @@ class ContinuousSpeechListener(
         onStatus("AURA siaga. Ucapkan “AURA” untuk memulai percakapan. Deteksi kata pemicu memakai transkripsi cloud.")
     }
 
+    /**
+     * Starts capture if needed and temporarily accepts the next utterance without
+     * requiring the user to say the wake word after clicking the desktop avatar.
+     */
+    @Synchronized fun beginConversation(): Boolean {
+        if (!running) start()
+        if (!running) return false
+        conversationUntilMs = System.currentTimeMillis() + CONVERSATION_WINDOW_MS
+        onStatus("Mode bicara aktif selama 60 detik. Silakan bicara.")
+        return true
+    }
+
     @Synchronized fun stop() {
         running = false
         conversationUntilMs = 0L
