@@ -82,7 +82,7 @@ jobs:
           jpackage `
             --type app-image `
             --name AURA `
-            --app-version 2.0.0 `
+            --app-version 2.1.0 `
             --input "aura-desktop/build/install/aura-desktop/lib" `
             --main-jar aura-desktop.jar `
             --main-class com.aura.desktop.AuraDesktopKt `
@@ -95,7 +95,7 @@ jobs:
           jpackage `
             --type exe `
             --name AURA `
-            --app-version 2.0.0 `
+            --app-version 2.1.0 `
             --vendor "AURA" `
             --description "AURA Work Companion for Windows" `
             --input "aura-desktop/build/install/aura-desktop/lib" `
@@ -123,13 +123,13 @@ jobs:
         run: |
           Compress-Archive `
             -Path "aura-desktop/build/jpackage/AURA" `
-            -DestinationPath "aura-desktop/build/AURA-Windows-2.0.0-portable.zip"
+            -DestinationPath "aura-desktop/build/AURA-Windows-2.1.0-portable.zip"
 
       - name: Upload Windows portable package
         uses: actions/upload-artifact@v4
         with:
           name: aura-windows-portable
-          path: aura-desktop/build/AURA-Windows-2.0.0-portable.zip
+          path: aura-desktop/build/AURA-Windows-2.1.0-portable.zip
           if-no-files-found: error
 
       - name: Upload native Windows installer
