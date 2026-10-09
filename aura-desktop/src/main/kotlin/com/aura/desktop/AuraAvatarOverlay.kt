@@ -1,5 +1,7 @@
 package com.aura.desktop
 
+import com.aura.core.affect.AuraAffectPolicy
+import com.aura.core.affect.AuraMood
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -119,14 +121,14 @@ class AuraAvatarOverlay(private val onAvatarClicked: () -> Unit) {
         fun setSpeaking(value: Boolean) { speaking = value; if (value) idleTicks = 0; repaint() }
 
         fun setMoodFromText(text: String) {
-            val t = text.lowercase()
-            mood = when {
-                listOf("maaf", "turut prihatin", "aku paham", "saya mengerti", "pasti berat", "jangan khawatir").any(t::contains) -> Mood.EMPATHETIC
-                listOf("hebat", "selamat", "berhasil", "mantap", "senang", "keren", "terima kasih").any(t::contains) -> Mood.JOY
-                listOf("kenapa", "bagaimana jika", "menarik", "mari kita telusuri", "coba kita cari").any(t::contains) -> Mood.CURIOUS
-                listOf("gagal", "error", "bermasalah", "waspada", "risiko tinggi", "tidak bisa").any(t::contains) -> Mood.FOCUSED
-                listOf("aduh", "yah, lagi", "kok gagal lagi", "merepotkan").any(t::contains) -> Mood.PLAYFULLY_ANNOYED
-                else -> Mood.NEUTRAL
+            mood = when (AuraAffectPolicy.fromAssistantText(text).mood) {
+                AuraMood.JOY, AuraMood.CELEBRATION -> Mood.JOY
+                AuraMood.CALM, AuraMood.REST -> Mood.CALM
+                AuraMood.CURIOUS -> Mood.CURIOUS
+                AuraMood.FOCUSED, AuraMood.CONCERN -> Mood.FOCUSED
+                AuraMood.EMPATHETIC -> Mood.EMPATHETIC
+                AuraMood.PLAYFULLY_ANNOYED -> Mood.PLAYFULLY_ANNOYED
+                AuraMood.NEUTRAL -> Mood.NEUTRAL
             }
             idleTicks = 0
             repaint()
