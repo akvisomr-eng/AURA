@@ -47,7 +47,7 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
     private val project = ProjectIntelligence()
     private val approvals = ApprovalEngine()
     private val workspaceState = WorkspaceState()
-    private val avatarOverlay = AuraAvatarOverlay { SwingUtilities.invokeLater { restoreFromTray() } }
+    private val avatarOverlay = AuraAvatarOverlay { handleAvatarClick() }
     private var workspace: Path? = null
     private val speechListener = ContinuousSpeechListener(
         apiKeyProvider = { SpeechCredentialStore.apiKey() },
@@ -606,6 +606,25 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         val content = runCatching { Files.readString(file.toPath()).take(12000) }.getOrNull()
         if (content == null) appendAura("Format ${file.extension} belum memiliki document adapter aktif.")
         else appendAura("Isi awal ${file.name}:\n$content")
+    }
+
+    /** Clicking the desktop avatar arms a voice turn without opening the full module. */
+    private fun handleAvatarClick() {
+        SwingUtilities.invokeLater {
+            if (SpeechCredentialStore.apiKey().isNullOrBlank()) {
+                // First use requires an explicit provider key; make setup available from the avatar.
+                restoreFromTray()
+                configureSpeech()
+            }
+            if (speechListener.beginConversation()) {
+                avatarOverlay.showSpeech("Silakan bicara. AURA sedang mendengarkan.", speaking = false)
+            } else {
+                avatarOverlay.showSpeech(
+                    "Suara belum aktif. Periksa API key dan mikrofon melalui Atur Suara.",
+                    speaking = false
+                )
+            }
+        }
     }
 
     private fun configureSpeech() {
