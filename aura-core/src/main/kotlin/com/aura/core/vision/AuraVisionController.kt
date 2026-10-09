@@ -24,11 +24,13 @@ class AuraVisionController(
     suspend fun discoverDevices(): List<AuraCameraDevice> =
         adapter.listDevices().filter { it.isConnected }.distinctBy { it.id }
 
-    fun updatePermission(value: AuraCameraPermission) {
-        permission = value
+    suspend fun updatePermission(value: AuraCameraPermission) {
         if (value != AuraCameraPermission.GRANTED && running) {
-            adapterCloseBestEffort()
+            adapter.close()
+            running = false
+            paused = false
         }
+        permission = value
     }
 
     suspend fun selectDevice(deviceId: String) {
@@ -71,14 +73,6 @@ class AuraVisionController(
 
     suspend fun stop() {
         if (running) adapter.close()
-        running = false
-        paused = false
-    }
-
-    private fun adapterCloseBestEffort() {
-        // Permission revocation is synchronous in the shared state model.
-        // Platform integrations should also close their native session in the
-        // permission callback before publishing the new permission state.
         running = false
         paused = false
     }
