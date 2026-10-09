@@ -88,12 +88,18 @@ class WindowsWebcamCaptureAdapter(
             webcam.viewSize = requestedSize
         }
 
-        if (!webcam.open()) {
-            throw IllegalStateException(
-                "Windows tidak dapat membuka kamera. Periksa izin privasi, aplikasi lain yang memakai kamera, dan koneksi perangkat."
-            )
+        try {
+            if (!webcam.open()) {
+                throw IllegalStateException(
+                    "Windows tidak dapat membuka kamera. Periksa izin privasi, aplikasi lain yang memakai kamera, dan koneksi perangkat."
+                )
+            }
+            activeWebcam = webcam
+        } catch (error: Exception) {
+            // Native drivers may allocate resources before reporting a failed open.
+            runCatching { webcam.close() }
+            throw error
         }
-        activeWebcam = webcam
     }
 
     override suspend fun close() {
