@@ -9,12 +9,11 @@ import java.util.ServiceLoader
 /**
  * Desktop integration seam for native camera backends.
  *
- * Native providers are discovered with ServiceLoader so Windows Media Foundation,
- * Linux V4L2, and macOS AVFoundation implementations can be shipped independently.
- * No provider means camera support is reported as unavailable; we never probe/open
- * hardware just to decide whether a camera exists.
+ * Providers declare platform compatibility and are selected without enumerating or
+ * opening hardware. Camera discovery happens only after the user requests a scan.
  */
 interface DesktopCameraBackendProvider {
+    fun isSupported(): Boolean = true
     fun createAdapter(): AuraCameraAdapter
     fun createPermissionGate(): AuraCameraPermissionGate
     fun displayName(): String
@@ -33,7 +32,7 @@ class DesktopCameraService(
         .asSequence()
         .toList()
 ) {
-    private val provider = providers.firstOrNull()
+    private val provider = providers.firstOrNull { it.isSupported() }
     private val manager: AuraCameraManager? = provider?.let {
         AuraCameraManager(it.createAdapter(), it.createPermissionGate())
     }
@@ -43,13 +42,13 @@ class DesktopCameraService(
             DesktopCameraAvailability(
                 available = false,
                 backendName = null,
-                message = "Backend kamera native belum tersedia. AURA tidak akan mengaktifkan atau memindai kamera dengan membuka perangkat secara diam-diam."
+                message = "Backend kamera native tidak tersedia untuk platform ini. AURA tidak akan membuka kamera secara diam-diam."
             )
         } else {
             DesktopCameraAvailability(
                 available = true,
                 backendName = provider.displayName(),
-                message = "Backend ${provider.displayName()} tersedia. Kamera tetap memerlukan tindakan mulai dan izin pengguna."
+                message = "Backend ${provider.displayName()} tersedia. Pemindaian dan capture hanya dilakukan setelah tindakan pengguna."
             )
         }
 
