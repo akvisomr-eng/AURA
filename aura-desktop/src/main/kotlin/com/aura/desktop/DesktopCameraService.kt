@@ -1,7 +1,6 @@
 package com.aura.desktop
 
 import com.aura.core.vision.AuraCameraAdapter
-import com.aura.core.vision.AuraCameraPermission
 import com.aura.core.vision.AuraCameraPermissionGate
 import com.aura.core.vision.AuraCameraManager
 import com.aura.core.vision.AuraCameraManagerState
@@ -60,15 +59,9 @@ class DesktopCameraService(
 
     suspend fun start(
         deviceId: String,
-        userInitiated: Boolean,
-        permissionAlreadyGranted: AuraCameraPermission? = null
-    ): AuraCameraManagerState? {
-        // The native provider owns the OS permission flow. The nullable argument is
-        // informational for callers and is deliberately not used to bypass that gate.
-        @Suppress("UNUSED_VARIABLE")
-        val permissionHint = permissionAlreadyGranted
-        return manager?.start(deviceId = deviceId, userInitiated = userInitiated)
-    }
+        userInitiated: Boolean
+    ): AuraCameraManagerState? =
+        manager?.start(deviceId = deviceId, userInitiated = userInitiated)
 
     suspend fun pause(): AuraCameraManagerState? = manager?.pause()
 
