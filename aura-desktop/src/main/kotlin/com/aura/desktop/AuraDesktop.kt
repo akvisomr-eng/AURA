@@ -180,8 +180,22 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         menu.add(show); menu.add(ready); menu.addSeparator(); menu.add(exit)
         val image = java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
-        g.font = Font(Font.SANS_SERIF, Font.BOLD, 20)
-        g.drawString("A", 7, 23)
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+        val cx = 16.0
+        val cy = 16.0
+        for (i in 0 until 16) {
+            val angle = Math.PI * 2 * i / 16
+            val inner = if (i % 2 == 0) 8.0 else 9.0
+            val outer = if (i % 2 == 0) 15.0 else 12.5
+            g.color = if (i % 2 == 0) java.awt.Color(255, 183, 45) else java.awt.Color(255, 224, 106)
+            g.stroke = java.awt.BasicStroke(if (i % 2 == 0) 2.0f else 1.5f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND)
+            g.drawLine((cx + kotlin.math.cos(angle) * inner).toInt(), (cy + kotlin.math.sin(angle) * inner).toInt(),
+                (cx + kotlin.math.cos(angle) * outer).toInt(), (cy + kotlin.math.sin(angle) * outer).toInt())
+        }
+        g.color = java.awt.Color(218, 94, 14)
+        g.fillOval(8, 8, 16, 16)
+        g.color = java.awt.Color(255, 245, 220)
+        g.drawOval(8, 8, 16, 16)
         g.dispose()
         trayIcon = TrayIcon(image, "AURA — Work Companion", menu).apply {
             isImageAutoSize = true
