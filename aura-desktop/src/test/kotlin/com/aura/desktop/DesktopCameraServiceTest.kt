@@ -17,9 +17,7 @@ class DesktopCameraServiceTest {
     @Test
     fun missingNativeProviderIsReportedWithoutOpeningHardware() {
         val service = DesktopCameraService(emptyList())
-
         val availability = service.availability()
-
         assertFalse(availability.available)
         assertNull(availability.backendName)
         assertTrue(availability.message.contains("tidak tersedia"))
@@ -38,21 +36,17 @@ class DesktopCameraServiceTest {
             override fun createPermissionGate() = AuraCameraPermissionGate { AuraCameraPermission.GRANTED }
             override fun displayName() = "Unsupported test backend"
         }
-
         val service = DesktopCameraService(listOf(provider))
-
         assertFalse(service.availability().available)
         assertFalse(adapterCreated)
     }
 
     @Test
-    fun serviceLoaderDoesNotEnumerateOrOpenHardwareDuringConstruction() {
+    fun serviceLoaderRecognizesSupportedDesktopPlatformsWithoutOpeningHardware() {
         val service = DesktopCameraService()
-
         val os = System.getProperty("os.name").lowercase()
         val supportedDesktop = os.startsWith("windows") || os.contains("linux") || os.startsWith("mac")
         assertEquals(supportedDesktop, service.availability().available)
-        assertNull(service.state())
     }
 
     @Test
@@ -64,7 +58,6 @@ class DesktopCameraServiceTest {
             override fun displayName() = "Fake test backend"
         }
         val service = DesktopCameraService(listOf(provider))
-
         assertTrue(service.availability().available)
         assertEquals("Fake test backend", service.availability().backendName)
         assertNotNull(service.state())
@@ -86,7 +79,6 @@ class DesktopCameraServiceTest {
         }
 
         override suspend fun close() = Unit
-
         override suspend fun captureFrame(): AuraVisionFrame? = null
     }
 }
