@@ -46,6 +46,15 @@ class DesktopCameraServiceTest {
     }
 
     @Test
+    fun serviceLoaderDoesNotEnumerateOrOpenHardwareDuringConstruction() {
+        val service = DesktopCameraService()
+
+        assertTrue(service.state() == null || service.state()?.devices?.isEmpty() == true)
+        val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+        assertEquals(isWindows, service.availability().available)
+    }
+
+    @Test
     fun registeredProviderExposesManagerWithoutStartingCapture() {
         val adapter = FakeDesktopCameraAdapter()
         val provider = object : DesktopCameraBackendProvider {
