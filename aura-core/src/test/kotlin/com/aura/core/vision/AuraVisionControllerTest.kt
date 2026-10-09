@@ -37,7 +37,7 @@ class AuraVisionControllerTest {
     fun pauseStopsFrameDeliveryAndStopClosesAdapter() {
         val adapter = FakeAdapter()
         val controller = AuraVisionController(adapter)
-        controller.updatePermission(AuraCameraPermission.GRANTED)
+        runSuspend { controller.updatePermission(AuraCameraPermission.GRANTED) }
         runSuspend { controller.selectDevice("usb-1") }
         runSuspend { controller.start(AuraCameraFormat(640, 480, 30)) }
         assertEquals(640, runSuspend { controller.captureFrame() }?.width)
@@ -45,7 +45,7 @@ class AuraVisionControllerTest {
         assertNull(runSuspend { controller.captureFrame() })
         runSuspend { controller.resume() }
         assertEquals(480, runSuspend { controller.captureFrame() }?.height)
-        runSuspend { controller.stop() }
+        runSuspend { controller.updatePermission(AuraCameraPermission.DENIED) }
         assertTrue(adapter.closed)
         assertEquals(false, controller.state().isRunning)
     }
