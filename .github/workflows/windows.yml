@@ -5,6 +5,14 @@ name: AURA Windows
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main, feat/aura-vision-desktop-integration]
+    paths:
+      - "aura-core/**"
+      - "aura-desktop/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - ".github/workflows/windows.yml"
   push:
     branches: [main]
     paths:
