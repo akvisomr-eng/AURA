@@ -25,7 +25,7 @@ class ContinuousSpeechListener(
     private val onStatus: (String) -> Unit,
     private val client: CloudSpeechRecognitionClient = CloudSpeechRecognitionClient()
 ) : AutoCloseable {
-    private val format = AudioFormat(16_000f, 16, 1, true, false)
+    @Volatile private var format = AudioFormat(16_000f, 16, 1, true, false)
     @Volatile private var running = false
     @Volatile private var line: TargetDataLine? = null
     @Volatile private var conversationUntilMs = 0L
@@ -36,11 +36,6 @@ class ContinuousSpeechListener(
         val key = apiKeyProvider()?.takeIf { it.isNotBlank() }
         if (key == null) {
             onStatus("Siaga suara belum aktif: konfigurasi AURA_SPEECH_API_KEY. Mikrofon tidak mengirim audio tanpa kunci API.")
-            return
-        }
-        val info = DataLine.Info(TargetDataLine::class.java, format)
-        if (!AudioSystem.isLineSupported(info)) {
-            onStatus("Mikrofon tidak mendukung format audio 16 kHz. Periksa perangkat input Windows.")
             return
         }
         running = true
@@ -73,18 +68,39 @@ class ContinuousSpeechListener(
     override fun close() = stop()
 
     private fun captureLoop(apiKey: String) {
-        val frameBytes = 640 // 20 ms at 16 kHz, mono, 16-bit PCM
-        val frame = ByteArray(frameBytes)
         var noiseFloor = 180.0
         var speech = ByteArrayOutputStream()
         var speechFrames = 0
         var quietFrames = 0
         var active = false
         try {
-            val input = AudioSystem.getTargetDataLine(format)
+            // Windows microphones commonly expose 44.1/48 kHz rather than 16 kHz.
+            // Try several PCM rates and package the selected rate in the WAV header.
+            var openedLine: TargetDataLine? = null
+            var selectedFormat: AudioFormat? = null
+            for (rate in CAPTURE_SAMPLE_RATES) {
+                val candidate = AudioFormat(rate, 16, 1, true, false)
+                val candidateLine = runCatching {
+                    AudioSystem.getTargetDataLine(candidate).also {
+                        val chunkBytes = maxOf(candidate.frameSize, (candidate.sampleRate * 0.02f).toInt() * candidate.frameSize)
+                        it.open(candidate, chunkBytes * 8)
+                    }
+                }.getOrNull()
+                if (candidateLine != null) {
+                    openedLine = candidateLine
+                    selectedFormat = candidate
+                    break
+                }
+            }
+            val input = openedLine ?: throw IllegalStateException(
+                "Tidak dapat membuka mikrofon dengan format PCM 16/44,1/48/22,05 kHz. Periksa izin mikrofon dan perangkat input Windows."
+            )
+            format = selectedFormat!!
             line = input
-            input.open(format, frameBytes * 8)
+            val frameBytes = maxOf(format.frameSize, (format.sampleRate * 0.02f).toInt() * format.frameSize)
+            val frame = ByteArray(frameBytes)
             input.start()
+            onStatus("Mikrofon aktif (${format.sampleRate.toInt()} Hz).")
             while (running && !Thread.currentThread().isInterrupted) {
                 val read = input.read(frame, 0, frame.size)
                 if (read <= 0) continue
@@ -112,7 +128,8 @@ class ContinuousSpeechListener(
                     val audioBytes = speech.toByteArray()
                     val sampleCount = audioBytes.size / 2
                     active = false
-                    if (sampleCount >= MIN_SPEECH_SAMPLES) transcribeAsync(audioBytes, apiKey)
+                    val minimumSamples = (MIN_SPEECH_SAMPLES * format.sampleRate / 16_000f).toInt()
+                    if (sampleCount >= minimumSamples) transcribeAsync(audioBytes, apiKey)
                     speech = ByteArrayOutputStream()
                     speechFrames = 0
                     quietFrames = 0
@@ -198,8 +215,9 @@ class ContinuousSpeechListener(
     companion object {
         // A short utterance such as the wake word “AURA” is commonly under one second.
         // The previous 25,000-sample gate silently discarded these utterances.
-        internal const val MIN_SPEECH_SAMPLES = 6_400
-        private const val CONVERSATION_WINDOW_MS = 15_000L
+        internal const val MIN_SPEECH_SAMPLES = 6_400 // reference threshold: 400 ms at 16 kHz
+        internal val CAPTURE_SAMPLE_RATES = listOf(16_000f, 44_100f, 48_000f, 22_050f)
+        private const val CONVERSATION_WINDOW_MS = 60_000L
     }
 
     init {
