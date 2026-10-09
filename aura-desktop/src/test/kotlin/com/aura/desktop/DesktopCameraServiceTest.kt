@@ -22,8 +22,27 @@ class DesktopCameraServiceTest {
 
         assertFalse(availability.available)
         assertNull(availability.backendName)
-        assertTrue(availability.message.contains("belum tersedia"))
+        assertTrue(availability.message.contains("tidak tersedia"))
         assertNull(service.state())
+    }
+
+    @Test
+    fun providerForAnotherPlatformIsNotSelected() {
+        var adapterCreated = false
+        val provider = object : DesktopCameraBackendProvider {
+            override fun isSupported() = false
+            override fun createAdapter(): AuraCameraAdapter {
+                adapterCreated = true
+                return FakeDesktopCameraAdapter()
+            }
+            override fun createPermissionGate() = AuraCameraPermissionGate { AuraCameraPermission.GRANTED }
+            override fun displayName() = "Unsupported test backend"
+        }
+
+        val service = DesktopCameraService(listOf(provider))
+
+        assertFalse(service.availability().available)
+        assertFalse(adapterCreated)
     }
 
     @Test
