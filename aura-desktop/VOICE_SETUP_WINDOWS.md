@@ -37,3 +37,7 @@ Setelah menyimpan variabel pengguna, tutup AURA sepenuhnya lalu jalankan ulang. 
 ## Jika mikrofon tidak aktif
 
 Periksa izin mikrofon Windows, pilih perangkat input yang benar sebagai perangkat default, pastikan tidak ada aplikasi lain yang mengunci mikrofon, dan pastikan variabel API key sudah tersedia di proses AURA. Status AURA akan menunjukkan jika listener tidak dapat dimulai.
+
+## Mulai bicara dari avatar
+
+Setelah API key suara dikonfigurasi, klik sekali avatar Surya Majapahit AURA di desktop untuk membuka sesi bicara selama 60 detik. Anda tidak perlu membuka jendela utama atau menekan tombol **Mulai Dengarkan**, dan untuk sesi yang dimulai lewat avatar Anda tidak perlu mengucapkan kata pemicu terlebih dahulu. Tanpa API key dan koneksi internet, transkripsi cloud tidak akan aktif; klik avatar akan menampilkan pengaturan yang diperlukan.
