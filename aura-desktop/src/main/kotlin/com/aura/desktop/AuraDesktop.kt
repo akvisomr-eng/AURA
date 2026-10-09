@@ -25,6 +25,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private var trayIcon: TrayIcon? = null
     private var keepReady = true
     private val runtime = AuraRuntime()
+    private val cameraService = DesktopCameraService()
     private val executor = Executors.newCachedThreadPool()
     private val transcript = JTextArea()
     private val input = JTextField()
@@ -79,7 +80,11 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val structureButton = JButton("Struktur Project")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
-        runtimeStatus.addActionListener { appendAura("Status: " + runtime.status()) }
+        runtimeStatus.addActionListener {
+            appendAura("Status: " + runtime.status())
+            val camera = cameraService.availability()
+            appendAura("AURA Vision: " + camera.message)
+        }
         tray.addActionListener { minimizeToTray() }
         workspaceButton.addActionListener { chooseWorkspace() }
         gitButton.addActionListener { showGitStatus() }
