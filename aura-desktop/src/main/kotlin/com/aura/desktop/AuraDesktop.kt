@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.runBlocking
 import javax.swing.*
 
-private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
+private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
     private var trayIcon: TrayIcon? = null
     private var keepReady = true
     private val runtime = AuraRuntime()
@@ -77,7 +77,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val clipboardButton = JButton("Clipboard")
         val openWorkspace = JButton("Buka Workspace")
         val projectButton = JButton("Analisis Project")
-        val screenButton = JButton("Screen Snapshot")
+        val screenButton = JButton("Tangkapan Layar")
         val approvalButton = JButton("Approval")
         val launchButton = JButton("Buka Aplikasi")
         val searchButton = JButton("Cari Workspace")
@@ -127,12 +127,12 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
-        top.add(JLabel("AURA Work Companion"), BorderLayout.WEST)
+        top.add(JLabel("AURA — Asisten Kerja"), BorderLayout.WEST)
         top.add(status, BorderLayout.CENTER)
         top.add(tools, BorderLayout.EAST)
 
         val gateway = JPanel(GridLayout(2, 2, 6, 6))
-        gateway.border = BorderFactory.createTitledBorder("AI Gateway (opsional)")
+        gateway.border = BorderFactory.createTitledBorder("Gerbang AI (opsional)")
         gateway.add(JLabel("URL")); gateway.add(gatewayUrl)
         gateway.add(JLabel("API Key")); gateway.add(gatewayKey)
 
@@ -197,7 +197,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         g.color = java.awt.Color(255, 245, 220)
         g.drawOval(8, 8, 16, 16)
         g.dispose()
-        trayIcon = TrayIcon(image, "AURA — Work Companion", menu).apply {
+        trayIcon = TrayIcon(image, "AURA — Asisten Kerja", menu).apply {
             isImageAutoSize = true
             addActionListener { restoreFromTray() }
         }
@@ -591,17 +591,34 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private fun appendAura(text: String) {
         transcript.append("\nAURA: $text\n")
         avatarOverlay.showSpeech(text, speaking = true)
-        // Use the Windows built-in speech engine when available; no external TTS install is required.
+        // Bahasa Indonesia wajib: jangan diam-diam jatuh ke suara bahasa Inggris.
         if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
             executor.execute {
-                val safeText = text.replace("'", "''").replace("\r", " ").replace("\n", " ").take(1200)
+                val safeText = text.replace("'", "''").replace("`", " ").replace("\r", " ").replace("\n", " ").take(1200)
+                val script = """
+                    Add-Type -AssemblyName System.Speech
+                    \$v = New-Object System.Speech.Synthesis.SpeechSynthesizer
+                    try {
+                      \$voice = \$v.GetInstalledVoices() | Where-Object { \$_.Enabled -and \$_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
+                      if (\$null -eq \$voice) {
+                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
+                        exit 23
+                      }
+                      \$v.SelectVoice(\$voice.VoiceInfo.Name)
+                      \$v.Speak('$safeText')
+                    } finally { \$v.Dispose() }
+                """.trimIndent()
                 runCatching {
-                    val command = "Add-Type -AssemblyName System.Speech; " +
-                        "\$v = New-Object System.Speech.Synthesis.SpeechSynthesizer; " +
-                        "try { \$v.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::NotSet, [System.Speech.Synthesis.VoiceAge]::NotSet, 0, [System.Globalization.CultureInfo]::GetCultureInfo('id-ID')) } catch {}; " +
-                        "\$v.Speak('$safeText'); \$v.Dispose()"
-                    ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command)
-                        .redirectErrorStream(true).start().waitFor()
+                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
+                        SwingUtilities.invokeLater {
+                            status.text = "Suara Indonesia belum terpasang"
+                            avatarOverlay.showSpeech("AURA memerlukan suara teks-ke-ucapan bahasa Indonesia. Tambahkan paket suara Indonesia di pengaturan Windows.", speaking = false)
+                        }
+                    }
                 }
             }
         }
