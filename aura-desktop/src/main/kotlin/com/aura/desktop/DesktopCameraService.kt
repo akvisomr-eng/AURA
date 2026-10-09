@@ -65,4 +65,6 @@ class DesktopCameraService(
     suspend fun pause(): AuraCameraManagerState? = manager?.pause()
 
     suspend fun stop(): AuraCameraManagerState? = manager?.stop()
+
+    suspend fun captureFrame() = manager?.captureFrame()
 }
