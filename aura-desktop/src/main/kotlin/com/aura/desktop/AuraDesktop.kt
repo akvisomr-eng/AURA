@@ -467,11 +467,11 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
             val result = runCatching { runBlocking { cameraService.start(device.id, userInitiated = true) } }
             SwingUtilities.invokeLater {
                 result.onSuccess { state ->
-                    if (state.status == AuraCameraManagerStatus.RUNNING) {
+                    if (state?.status == AuraCameraManagerStatus.RUNNING) {
                         appendAura("Kamera aktif: ${device.displayName}. Indikator preview AURA Vision dibuka.")
                         showCameraPreview()
                     } else {
-                        appendAura("Kamera tidak dapat dimulai: ${state.lastError ?: state.status}")
+                        appendAura("Kamera tidak dapat dimulai: ${state?.lastError ?: state?.status ?: "backend tidak tersedia"}")
                     }
                 }.onFailure {
                     appendAura("Gagal memulai kamera: ${it.message}")
