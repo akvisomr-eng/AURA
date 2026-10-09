@@ -549,9 +549,15 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
                             val height = (image.height * scale).toInt().coerceAtLeast(1)
                             label.icon = ImageIcon(image.getScaledInstance(width, height, java.awt.Image.SCALE_FAST))
                             label.text = ""
-                        } else if (label != null && cameraService.state()?.status == AuraCameraManagerStatus.ERROR) {
-                            label.icon = null
-                            label.text = "Kamera terputus atau frame gagal. Hentikan lalu pindai ulang."
+                        } else if (label != null && label.icon == null) {
+                            // Keep the preview window informative when the backend starts
+                            // successfully but the first frame is delayed or unavailable.
+                            val state = cameraService.state()
+                            label.text = if (state?.status == AuraCameraManagerStatus.ERROR) {
+                                "Kamera terputus atau frame gagal. Hentikan lalu pindai ulang."
+                            } else {
+                                "Menunggu frame dari kamera… Pastikan perangkat tersambung dan tidak dipakai aplikasi lain."
+                            }
                         }
                     } finally {
                         cameraFrameInFlight.set(false)
