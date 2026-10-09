@@ -58,7 +58,7 @@ class CloudSpeechRecognitionClient(
             val safeMessage = response.body().take(500)
             throw IllegalStateException("Layanan pengenalan ucapan mengembalikan HTTP ${response.statusCode()}: $safeMessage")
         }
-        return Regex("\"\"text\"\"\\s*:\\s*\"\"((?:\\\\.|[^\"\"\\\\])*)\"\"")
+        return Regex("\"text\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"")
             .find(response.body())?.groupValues?.get(1)?.let(::decodeJsonString)
             ?.trim()?.takeIf { it.isNotEmpty() }
             ?: throw IllegalStateException("Respons transkripsi cloud tidak berisi teks yang dapat dibaca.")
