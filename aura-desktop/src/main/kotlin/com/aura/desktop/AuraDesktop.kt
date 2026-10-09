@@ -36,6 +36,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private val project = ProjectIntelligence()
     private val approvals = ApprovalEngine()
     private val workspaceState = WorkspaceState()
+    private val avatarOverlay = AuraAvatarOverlay { SwingUtilities.invokeLater { restoreFromTray() } }
     private var workspace: Path? = null
 
     init {
@@ -130,6 +131,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         appendAura("Mode lokal aktif. Gateway dapat digunakan bila URL dikonfigurasi.")
         restoreWorkspace()
         setupTray()
+        avatarOverlay.show()
     }
 
     private fun setupTray() {
@@ -422,7 +424,24 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     }
 
     private fun appendUser(text: String) { transcript.append("\nAnda: $text\n") }
-    private fun appendAura(text: String) { transcript.append("\nAURA: $text\n") }
+    private fun appendAura(text: String) {
+        transcript.append("\nAURA: $text\n")
+        avatarOverlay.showSpeech(text, speaking = true)
+        // Use the Windows built-in speech engine when available; no external TTS install is required.
+        if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+            executor.execute {
+                val safeText = text.replace("'", "''").replace("\r", " ").replace("\n", " ").take(1200)
+                runCatching {
+                    ProcessBuilder(
+                        "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                        "Add-Type -AssemblyName System.Speech; $v = New-Object System.Speech.Synthesis.SpeechSynthesizer; " +
+                            "$v.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::NotSet, [System.Speech.Synthesis.VoiceAge]::NotSet, 0, [System.Globalization.CultureInfo]::GetCultureInfo('id-ID')); " +
+                            "$v.Speak('$safeText'); $v.Dispose()"
+                    ).redirectErrorStream(true).start().waitFor()
+                }
+            }
+        }
+    }
 }
 
-fun main() { SwingUtilities.invokeLater { AuraDesktopWindow().isVisible = true } }
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
