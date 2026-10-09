@@ -7,11 +7,14 @@ import com.aura.core.AuraRoutingMode
 import com.aura.core.AuraRoutingRequest
 import com.aura.core.AuraRuntime
 import com.aura.core.AuraTaskType
+import com.aura.core.vision.AuraCameraDevice
+import com.aura.core.vision.AuraCameraManagerStatus
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.GridLayout
 import java.awt.Insets
+import java.awt.image.BufferedImage
 import java.awt.SystemTray
 import java.awt.TrayIcon
 import java.awt.PopupMenu
@@ -19,6 +22,8 @@ import java.awt.MenuItem
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.runBlocking
 import javax.swing.*
 
 private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
@@ -26,6 +31,11 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
     private var keepReady = true
     private val runtime = AuraRuntime()
     private val cameraService = DesktopCameraService()
+    private var cameraDevices: List<AuraCameraDevice> = emptyList()
+    private var cameraPreviewWindow: JFrame? = null
+    private var cameraPreviewLabel: JLabel? = null
+    private var cameraPreviewTimer: javax.swing.Timer? = null
+    private val cameraFrameInFlight = AtomicBoolean(false)
     private val executor = Executors.newCachedThreadPool()
     private val transcript = JTextArea()
     private val input = JTextField()
@@ -57,7 +67,7 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         send.addActionListener { sendMessage() }
         input.addActionListener { sendMessage() }
 
-        val tools = JPanel(GridLayout(4, 4, 8, 8))
+        val tools = JPanel(GridLayout(0, 4, 8, 8))
         val openFile = JButton("Buka Dokumen")
         val readFile = JButton("Baca File")
         val runtimeStatus = JButton("Status")
@@ -78,6 +88,9 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         val readDocButton = JButton("Baca Dokumen")
         val buildButton = JButton("Build/Test Project")
         val structureButton = JButton("Struktur Project")
+        val scanCameraButton = JButton("Pindai Kamera")
+        val startCameraButton = JButton("Mulai Kamera")
+        val stopCameraButton = JButton("Hentikan Kamera")
         openFile.addActionListener { chooseFile(false) }
         readFile.addActionListener { chooseFile(true) }
         runtimeStatus.addActionListener {
@@ -102,11 +115,15 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
         readDocButton.addActionListener { readDocument() }
         buildButton.addActionListener { runRecommendedBuild() }
         structureButton.addActionListener { showProjectStructure() }
+        scanCameraButton.addActionListener { scanCameras() }
+        startCameraButton.addActionListener { startCamera() }
+        stopCameraButton.addActionListener { stopCamera() }
         tools.add(openFile); tools.add(readFile); tools.add(runtimeStatus); tools.add(tray)
         tools.add(workspaceButton); tools.add(gitButton); tools.add(clipboardButton); tools.add(openWorkspace)
         tools.add(projectButton); tools.add(screenButton); tools.add(approvalButton); tools.add(launchButton)
         tools.add(searchButton); tools.add(diffButton); tools.add(commandButton); tools.add(copyButton)
         tools.add(fileSearchButton); tools.add(readDocButton); tools.add(buildButton); tools.add(structureButton)
+        tools.add(scanCameraButton); tools.add(startCameraButton); tools.add(stopCameraButton)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -406,6 +423,128 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
                     .onFailure { appendAura("Task gagal dijalankan: ${it.message}"); status.text = "AURA siap." }
             }
         }
+    }
+
+    private fun scanCameras() {
+        val availability = cameraService.availability()
+        if (!availability.available) {
+            appendAura("AURA Vision: ${availability.message}")
+            return
+        }
+        status.text = "Memindai kamera..."
+        executor.execute {
+            val result = runCatching { runBlocking { cameraService.refreshDevices() } }
+            SwingUtilities.invokeLater {
+                result.onSuccess { state ->
+                    cameraDevices = state?.devices.orEmpty()
+                    if (cameraDevices.isEmpty()) {
+                        appendAura("AURA Vision: tidak ada kamera ditemukan. Pastikan webcam tersambung dan coba pindai lagi.")
+                    } else {
+                        appendAura("AURA Vision: ditemukan ${cameraDevices.size} kamera:\n" +
+                            cameraDevices.joinToString("\n") { "• ${it.displayName} [${it.id}]" })
+                    }
+                }.onFailure {
+                    appendAura("Pemindaian kamera gagal: ${it.message}")
+                }
+                status.text = "AURA siap."
+            }
+        }
+    }
+
+    private fun startCamera() {
+        if (cameraDevices.isEmpty()) {
+            appendAura("Pindai kamera terlebih dahulu sebelum memulai.")
+            return
+        }
+        val options = cameraDevices.map { "${it.displayName} — ${it.id}" }.toTypedArray()
+        val selected = JOptionPane.showInputDialog(
+            this, "Pilih kamera yang ingin diaktifkan:", "AURA Vision",
+            JOptionPane.PLAIN_MESSAGE, null, options, options.firstOrNull()
+        ) as? String ?: return
+        val device = cameraDevices[options.indexOf(selected)]
+        status.text = "Mengaktifkan kamera..."
+        executor.execute {
+            val result = runCatching { runBlocking { cameraService.start(device.id, userInitiated = true) } }
+            SwingUtilities.invokeLater {
+                result.onSuccess { state ->
+                    if (state.status == AuraCameraManagerStatus.RUNNING) {
+                        appendAura("Kamera aktif: ${device.displayName}. Indikator preview AURA Vision dibuka.")
+                        showCameraPreview()
+                    } else {
+                        appendAura("Kamera tidak dapat dimulai: ${state.lastError ?: state.status}")
+                    }
+                }.onFailure {
+                    appendAura("Gagal memulai kamera: ${it.message}")
+                }
+                status.text = "AURA siap."
+            }
+        }
+    }
+
+    private fun stopCamera() {
+        cameraPreviewTimer?.stop()
+        cameraPreviewTimer = null
+        cameraPreviewWindow?.dispose()
+        cameraPreviewWindow = null
+        cameraPreviewLabel = null
+        executor.execute {
+            val result = runCatching { runBlocking { cameraService.stop() } }
+            SwingUtilities.invokeLater {
+                result.onSuccess { appendAura("AURA Vision: kamera dihentikan dan perangkat dilepas.") }
+                    .onFailure { appendAura("Gagal menghentikan kamera: ${it.message}") }
+                status.text = "AURA siap."
+            }
+        }
+    }
+
+    private fun showCameraPreview() {
+        cameraPreviewTimer?.stop()
+        cameraPreviewLabel = JLabel("Menghubungkan preview kamera...", SwingConstants.CENTER)
+        val preview = JFrame("AURA Vision — Live Camera")
+        preview.defaultCloseOperation = JFrame.DISPOSE_ON_CLOSE
+        preview.minimumSize = Dimension(480, 360)
+        preview.setSize(800, 600)
+        preview.setLocationRelativeTo(this)
+        preview.add(cameraPreviewLabel)
+        preview.addWindowListener(object : java.awt.event.WindowAdapter() {
+            override fun windowClosed(e: java.awt.event.WindowEvent) {
+                cameraPreviewTimer?.stop()
+                cameraPreviewTimer = null
+                cameraPreviewWindow = null
+                cameraPreviewLabel = null
+                executor.execute { runCatching { runBlocking { cameraService.stop() } } }
+            }
+        })
+        cameraPreviewWindow = preview
+        preview.isVisible = true
+
+        cameraPreviewTimer = javax.swing.Timer(150) {
+            if (!cameraFrameInFlight.compareAndSet(false, true)) return@Timer
+            executor.execute {
+                val frame = runCatching { runBlocking { cameraService.captureFrame() } }.getOrNull()
+                SwingUtilities.invokeLater {
+                    try {
+                        val label = cameraPreviewLabel
+                        val image = frame?.platformImage as? BufferedImage
+                        if (label != null && image != null && label.width > 0 && label.height > 0) {
+                            val scale = minOf(
+                                label.width.toDouble() / image.width,
+                                label.height.toDouble() / image.height
+                            )
+                            val width = (image.width * scale).toInt().coerceAtLeast(1)
+                            val height = (image.height * scale).toInt().coerceAtLeast(1)
+                            label.icon = ImageIcon(image.getScaledInstance(width, height, java.awt.Image.SCALE_FAST))
+                            label.text = ""
+                        } else if (label != null && cameraService.state()?.status == AuraCameraManagerStatus.ERROR) {
+                            label.icon = null
+                            label.text = "Kamera terputus atau frame gagal. Hentikan lalu pindai ulang."
+                        }
+                    } finally {
+                        cameraFrameInFlight.set(false)
+                    }
+                }
+            }
+        }.apply { start() }
     }
 
     private fun showClipboard() {
