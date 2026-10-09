@@ -434,9 +434,45 @@ private class AuraDesktopWindow : JFrame("AURA — Work Companion") {
                 runCatching {
                     ProcessBuilder(
                         "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                        "Add-Type -AssemblyName System.Speech; $v = New-Object System.Speech.Synthesis.SpeechSynthesizer; " +
-                            "$v.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::NotSet, [System.Speech.Synthesis.VoiceAge]::NotSet, 0, [System.Globalization.CultureInfo]::GetCultureInfo('id-ID')); " +
-                            "$v.Speak('$safeText'); $v.Dispose()"
+                        "Add-Type -AssemblyName System.Speech; ${'
+                    ).redirectErrorStream(true).start().waitFor()
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+ }v = New-Object System.Speech.Synthesis.SpeechSynthesizer; " +
+                            "try { ${'
+                    ).redirectErrorStream(true).start().waitFor()
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+ }v.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::NotSet, [System.Speech.Synthesis.VoiceAge]::NotSet, 0, [System.Globalization.CultureInfo]::GetCultureInfo('id-ID')) } catch {}; " +
+                            "${'
+                    ).redirectErrorStream(true).start().waitFor()
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+ }v.Speak('$safeText'); ${'
+                    ).redirectErrorStream(true).start().waitFor()
+                }
+            }
+        }
+    }
+}
+
+fun main() { SwingUtilities.invokeLater { AuraDesktopWindow() } }
+ }v.Dispose()"
                     ).redirectErrorStream(true).start().waitFor()
                 }
             }
