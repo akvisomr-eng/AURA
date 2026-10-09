@@ -50,7 +50,7 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
     private val avatarOverlay = AuraAvatarOverlay { SwingUtilities.invokeLater { restoreFromTray() } }
     private var workspace: Path? = null
     private val speechListener = ContinuousSpeechListener(
-        apiKeyProvider = { System.getenv("AURA_SPEECH_API_KEY") },
+        apiKeyProvider = { SpeechCredentialStore.apiKey() },
         onText = { recognized ->
             SwingUtilities.invokeLater {
                 input.text = recognized
@@ -91,9 +91,12 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         val screenButton = JButton("Tangkapan Layar")
         val listenButton = JButton("Mulai Dengarkan")
         val stopListenButton = JButton("Hentikan Dengarkan")
+        val voiceSettingsButton = JButton("Atur Suara")
         listenButton.toolTipText = "Aktifkan mikrofon; segmen ucapan dikirim ke cloud jika AURA_SPEECH_API_KEY tersedia."
         listenButton.addActionListener { speechListener.start() }
         stopListenButton.addActionListener { speechListener.stop() }
+        voiceSettingsButton.toolTipText = "Masukkan API key untuk mengaktifkan transkripsi kata pemicu dan fallback suara Indonesia."
+        voiceSettingsButton.addActionListener { configureSpeech() }
         val approvalButton = JButton("Approval")
         val launchButton = JButton("Buka Aplikasi")
         val searchButton = JButton("Cari Workspace")
@@ -140,7 +143,7 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         tools.add(searchButton); tools.add(diffButton); tools.add(commandButton); tools.add(copyButton)
         tools.add(fileSearchButton); tools.add(readDocButton); tools.add(buildButton); tools.add(structureButton)
         tools.add(scanCameraButton); tools.add(startCameraButton); tools.add(stopCameraButton)
-        tools.add(listenButton); tools.add(stopListenButton)
+        tools.add(listenButton); tools.add(stopListenButton); tools.add(voiceSettingsButton)
 
         val top = JPanel(BorderLayout(8, 8))
         top.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
@@ -605,6 +608,29 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
         else appendAura("Isi awal ${file.name}:\n$content")
     }
 
+    private fun configureSpeech() {
+        val field = JPasswordField(32)
+        val currentKey = SpeechCredentialStore.apiKey()
+        if (!currentKey.isNullOrBlank()) field.text = currentKey
+        val panel = JPanel(BorderLayout(8, 8))
+        panel.add(JLabel("<html><b>Aktifkan suara AURA</b><br>Masukkan API key Anda untuk transkripsi kata pemicu dan suara Indonesia.<br>Audio ucapan akan dikirim ke layanan transkripsi cloud saat siaga aktif.</html>"), BorderLayout.NORTH)
+        panel.add(field, BorderLayout.CENTER)
+        panel.add(JLabel("Kunci yang dimasukkan di sini hanya disimpan dalam memori sampai AURA ditutup."), BorderLayout.SOUTH)
+        val choice = JOptionPane.showConfirmDialog(this, panel, "Pengaturan Suara AURA", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
+        if (choice != JOptionPane.OK_OPTION) return
+        val key = String(field.password).trim()
+        if (key.isBlank()) {
+            SpeechCredentialStore.clearSessionKey()
+            speechListener.stop()
+            status.text = "Siaga suara nonaktif: masukkan API key melalui Atur Suara."
+            appendAura("Siaga suara dimatikan. Tidak ada audio yang dikirim tanpa API key.")
+            return
+        }
+        SpeechCredentialStore.setSessionKey(key)
+        speechListener.stop()
+        speechListener.start()
+    }
+
     private fun appendUser(text: String) { transcript.append("\nAnda: $text\n") }
     private fun appendAura(text: String) {
         transcript.append("\nAURA: $text\n")
@@ -641,8 +667,10 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
                     } finally { ${'$'}v.Dispose() }
                 """.trimIndent()
                 runCatching {
-                    val process = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
-                        .redirectErrorStream(true).start()
+                    val processBuilder = ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                        .redirectErrorStream(true)
+                    SpeechCredentialStore.apiKey()?.let { processBuilder.environment()["AURA_SPEECH_API_KEY"] = it }
+                    val process = processBuilder.start()
                     val output = process.inputStream.bufferedReader().readText()
                     val exitCode = process.waitFor()
                     if (exitCode == 23 || output.contains("VOICE_ID_ID_NOT_INSTALLED")) {
