@@ -100,7 +100,7 @@ class ContinuousSpeechListener(
                     val audioBytes = speech.toByteArray()
                     val sampleCount = audioBytes.size / 2
                     active = false
-                    if (sampleCount >= 25_000) transcribeAsync(audioBytes, apiKey)
+                    if (sampleCount >= MIN_SPEECH_SAMPLES) transcribeAsync(audioBytes, apiKey)
                     speech = ByteArrayOutputStream()
                     speechFrames = 0
                     quietFrames = 0
@@ -184,6 +184,9 @@ class ContinuousSpeechListener(
     }
 
     companion object {
+        // A short utterance such as the wake word “AURA” is commonly under one second.
+        // The previous 25,000-sample gate silently discarded these utterances.
+        internal const val MIN_SPEECH_SAMPLES = 6_400
         private const val CONVERSATION_WINDOW_MS = 15_000L
     }
 
