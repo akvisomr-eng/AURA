@@ -13,9 +13,11 @@ import kotlin.concurrent.thread
 import kotlin.math.sqrt
 
 /**
- * Opt-in continuous microphone listener. A lightweight adaptive energy gate
- * discards quiet/noise-only frames; only speech-like segments are sent to cloud.
- * The caller must explicitly start it and provide the speech API key.
+ * Desktop voice pipeline.
+ *
+ * Wake phrase handling currently uses Indonesian cloud transcription after local
+ * voice-activity segmentation; it is not a fully offline acoustic wake-word model.
+ * Audio segments are uploaded only when AURA_SPEECH_API_KEY is configured.
  */
 class ContinuousSpeechListener(
     private val apiKeyProvider: () -> String?,
@@ -26,32 +28,34 @@ class ContinuousSpeechListener(
     private val format = AudioFormat(16_000f, 16, 1, true, false)
     @Volatile private var running = false
     @Volatile private var line: TargetDataLine? = null
+    @Volatile private var conversationUntilMs = 0L
     private var worker: Thread? = null
 
     @Synchronized fun start() {
         if (running) return
         val key = apiKeyProvider()?.takeIf { it.isNotBlank() }
         if (key == null) {
-            onStatus("Pengenalan cloud belum aktif: atur AURA_SPEECH_API_KEY. Tidak ada biaya yang dibuat otomatis.")
+            onStatus("Siaga suara belum aktif: konfigurasi AURA_SPEECH_API_KEY. Mikrofon tidak mengirim audio tanpa kunci API.")
             return
         }
         val info = DataLine.Info(TargetDataLine::class.java, format)
         if (!AudioSystem.isLineSupported(info)) {
-            onStatus("Mikrofon tidak mendukung format audio 16 kHz. Listener belum dimulai.")
+            onStatus("Mikrofon tidak mendukung format audio 16 kHz. Periksa perangkat input Windows.")
             return
         }
         running = true
         worker = thread(name = "aura-microphone-listener", isDaemon = true) { captureLoop(key) }
-        onStatus("Mikrofon aktif. AURA menyaring suara pelan; segmen ucapan akan dikirim ke cloud.")
+        onStatus("AURA siaga. Ucapkan “AURA” untuk memulai percakapan. Deteksi kata pemicu memakai transkripsi cloud.")
     }
 
     @Synchronized fun stop() {
         running = false
+        conversationUntilMs = 0L
         runCatching { line?.stop(); line?.close() }
         line = null
         worker?.interrupt()
         worker = null
-        onStatus("Mikrofon AURA dihentikan.")
+        onStatus("Mikrofon AURA dimatikan.")
     }
 
     override fun close() = stop()
@@ -94,11 +98,9 @@ class ContinuousSpeechListener(
                 val finished = active && (quietFrames >= 45 || speechFrames >= 1000)
                 if (finished) {
                     val audioBytes = speech.toByteArray()
-                    val frameCount = audioBytes.size / 2
+                    val sampleCount = audioBytes.size / 2
                     active = false
-                    if (frameCount >= 25_000) {
-                        transcribeAsync(audioBytes, apiKey)
-                    }
+                    if (sampleCount >= 25_000) transcribeAsync(audioBytes, apiKey)
                     speech = ByteArrayOutputStream()
                     speechFrames = 0
                     quietFrames = 0
@@ -123,23 +125,43 @@ class ContinuousSpeechListener(
                 return@thread
             }
             try {
-                val language = System.getenv("AURA_SPEECH_LANGUAGE")
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { code -> SpeechLanguage.common.firstOrNull { it.code == code } }
-                val text = client.transcribe(file, key, language)
-                if (text.isNotBlank()) onText(text)
+                // Force Indonesian by default; allow an explicit override for multilingual use.
+                val languageCode = System.getenv("AURA_SPEECH_LANGUAGE")
+                    ?.takeIf { it.isNotBlank() } ?: "id"
+                val language = SpeechLanguage.common.firstOrNull { it.code == languageCode }
+                val recognized = client.transcribe(file, key, language).trim()
+                if (recognized.isNotBlank()) routeRecognizedText(recognized)
             } catch (e: Exception) {
-                onStatus("Transkripsi cloud gagal: ${e.message ?: e.javaClass.simpleName}")
+                onStatus("Transkripsi ucapan gagal: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 runCatching { Files.deleteIfExists(file) }
             }
         }
     }
 
+    private fun routeRecognizedText(text: String) {
+        val now = System.currentTimeMillis()
+        val normalized = text.trim().replace(Regex("""^[,.:;!?\s]+"""), "")
+        val wakeMatch = Regex("""(?i)^aura\b[,.!?;:]?\s*""").find(normalized)
+        if (wakeMatch != null) {
+            conversationUntilMs = now + CONVERSATION_WINDOW_MS
+            val command = normalized.substring(wakeMatch.range.last + 1).trim()
+            onStatus(if (command.isBlank()) "AURA terbangun. Silakan lanjutkan perintah Anda." else "Kata pemicu terdeteksi; AURA memproses perintah.")
+            if (command.isNotBlank()) onText(command)
+            return
+        }
+        if (now <= conversationUntilMs) {
+            conversationUntilMs = now + CONVERSATION_WINDOW_MS
+            onText(normalized)
+        } else {
+            // Do not act on ordinary background conversation unless the wake phrase was heard.
+            onStatus("AURA tetap siaga. Ucapkan “AURA” untuk memulai percakapan.")
+        }
+    }
+
     private fun wavBytes(pcm: ByteArray): ByteArray {
-        val pcmFormat = format
         val stream = javax.sound.sampled.AudioInputStream(
-            ByteArrayInputStream(pcm), pcmFormat, (pcm.size / pcmFormat.frameSize).toLong()
+            ByteArrayInputStream(pcm), format, (pcm.size / format.frameSize).toLong()
         )
         return ByteArrayOutputStream().use { out ->
             AudioSystem.write(stream, AudioFileFormat.Type.WAVE, out)
@@ -159,5 +181,14 @@ class ContinuousSpeechListener(
             i += 2
         }
         return if (count == 0) 0.0 else sqrt(sum / count)
+    }
+
+    companion object {
+        private const val CONVERSATION_WINDOW_MS = 15_000L
+    }
+
+    init {
+        // The desktop assistant should enter hands-free standby without a button press.
+        start()
     }
 }

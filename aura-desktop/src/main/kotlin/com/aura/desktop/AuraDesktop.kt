@@ -619,11 +619,25 @@ private class AuraDesktopWindow : JFrame("AURA — Asisten Kerja") {
                     try {
                       ${'$'}voice = ${'$'}v.GetInstalledVoices() | Where-Object { ${'$'}_.Enabled -and ${'$'}_.VoiceInfo.Culture.Name -eq 'id-ID' } | Select-Object -First 1
                       if (${'$'}null -eq ${'$'}voice) {
-                        [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED')
-                        exit 23
+                        ${'$'}key = [Environment]::GetEnvironmentVariable('AURA_SPEECH_API_KEY')
+                        if ([string]::IsNullOrWhiteSpace(${'$'}key)) {
+                          [Console]::Error.WriteLine('VOICE_ID_ID_NOT_INSTALLED_AND_NO_SPEECH_API_KEY')
+                          exit 23
+                        }
+                        ${'$'}wavPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), ('aura-tts-' + [guid]::NewGuid().ToString() + '.wav'))
+                        try {
+                          ${'$'}payload = @{ model = 'gpt-4o-mini-tts'; voice = 'coral'; input = '$safeText'; instructions = 'Berbicaralah dalam bahasa Indonesia yang alami, jelas, hangat, dengan pelafalan dan intonasi penutur bahasa Indonesia.'; response_format = 'wav' } | ConvertTo-Json -Compress
+                          Invoke-WebRequest -UseBasicParsing -Uri 'https://api.openai.com/v1/audio/speech' -Method Post -Headers @{ Authorization = ('Bearer ' + ${'$'}key) } -ContentType 'application/json; charset=utf-8' -Body ([System.Text.Encoding]::UTF8.GetBytes(${'$'}payload)) -OutFile ${'$'}wavPath
+                          ${'$'}player = New-Object System.Media.SoundPlayer(${'$'}wavPath)
+                          ${'$'}player.PlaySync()
+                          ${'$'}player.Dispose()
+                        } finally {
+                          Remove-Item -LiteralPath ${'$'}wavPath -Force -ErrorAction SilentlyContinue
+                        }
+                      } else {
+                        ${'$'}v.SelectVoice(${'$'}voice.VoiceInfo.Name)
+                        ${'$'}v.Speak('$safeText')
                       }
-                      ${'$'}v.SelectVoice(${'$'}voice.VoiceInfo.Name)
-                      ${'$'}v.Speak('${'$'}safeText')
                     } finally { ${'$'}v.Dispose() }
                 """.trimIndent()
                 runCatching {
