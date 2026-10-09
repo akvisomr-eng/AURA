@@ -10,39 +10,36 @@ import com.aura.core.vision.AuraVisionCapability
 import com.aura.core.vision.AuraVisionFrame
 import com.github.sarxos.webcam.Webcam
 import java.awt.Dimension
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
- * Windows desktop camera provider backed by Webcam Capture's built-in native driver.
+ * Cross-platform desktop camera provider backed by Webcam Capture.
  *
- * Device enumeration is separate from open(): constructing the provider does not
- * enumerate, reserve, or capture from a camera. Capture begins only through the
- * shared manager's explicit start action.
+ * Provider discovery does not enumerate or reserve hardware. Camera discovery
+ * and capture only happen after the user invokes the corresponding UI action.
+ * Actual device permissions and driver availability remain OS-controlled.
  */
-class WindowsWebcamCaptureProvider : DesktopCameraBackendProvider {
-    override fun isSupported(): Boolean =
-        System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+class DesktopWebcamCaptureProvider : DesktopCameraBackendProvider {
+    override fun isSupported(): Boolean {
+        val os = System.getProperty("os.name").lowercase(Locale.ROOT)
+        return os.startsWith("windows") || os.contains("linux") || os.startsWith("mac")
+    }
 
-    override fun createAdapter(): AuraCameraAdapter = WindowsWebcamCaptureAdapter()
+    override fun createAdapter(): AuraCameraAdapter = DesktopWebcamCaptureAdapter()
 
     override fun createPermissionGate(): AuraCameraPermissionGate =
         AuraCameraPermissionGate {
-            // Desktop JVM apps do not have Android-style runtime camera permission
-            // prompts. The manager reaches this gate only after an explicit user
-            // action; Windows privacy policy / device access failures are surfaced
-            // when the native backend attempts to open the selected camera.
+            // Desktop OS camera permissions are enforced by the OS/device backend
+            // when a user explicitly starts capture; this is not an Android prompt.
             AuraCameraPermission.GRANTED
         }
 
-    override fun displayName(): String = "Windows native webcam backend"
+    override fun displayName(): String = "Desktop Webcam Capture backend"
 }
 
-/**
- * Adapter for USB UVC and built-in cameras visible to the Windows camera stack.
- * Webcam Capture exposes image sizes but not a reliable supported-FPS list, so this
- * adapter does not invent advertised frame-rate capabilities.
- */
-class WindowsWebcamCaptureAdapter(
+/** Adapter for built-in and USB webcams exposed by the host OS camera stack. */
+class DesktopWebcamCaptureAdapter(
     private val discover: () -> List<Webcam> = {
         Webcam.getWebcams(5, TimeUnit.SECONDS)
     }
@@ -91,12 +88,11 @@ class WindowsWebcamCaptureAdapter(
         try {
             if (!webcam.open()) {
                 throw IllegalStateException(
-                    "Windows tidak dapat membuka kamera. Periksa izin privasi, aplikasi lain yang memakai kamera, dan koneksi perangkat."
+                    "Sistem operasi tidak dapat membuka kamera. Periksa izin privasi, apakah kamera sedang dipakai aplikasi lain, driver, dan koneksi perangkat."
                 )
             }
             activeWebcam = webcam
         } catch (error: Exception) {
-            // Native drivers may allocate resources before reporting a failed open.
             runCatching { webcam.close() }
             throw error
         }
@@ -105,9 +101,7 @@ class WindowsWebcamCaptureAdapter(
     override suspend fun close() {
         val webcam = activeWebcam
         activeWebcam = null
-        if (webcam != null && webcam.isOpen) {
-            webcam.close()
-        }
+        if (webcam != null && webcam.isOpen) webcam.close()
     }
 
     override suspend fun captureFrame(): AuraVisionFrame? {
